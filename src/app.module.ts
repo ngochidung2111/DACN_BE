@@ -29,4 +29,5 @@ import authLocalConfig from './config/auth.local.config';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule {
+}
