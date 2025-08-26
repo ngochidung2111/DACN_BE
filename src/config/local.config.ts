@@ -12,6 +12,10 @@ import { Ticket } from '../management/entity/ticket.entity';
 import { Notification } from '../management/entity/notification.entity';
 import { CompanyAnnouncement } from '../management/entity/company-announcement.entity';
 import { AnnouncementInteraction } from '../management/entity/announcement-interaction.entity';
-
-export default registerAs('database', () => ({
-}));
+import { merge } from 'lodash';
+import defaultConfig from './default.config';
+export default registerAs('database', () => {
+  const localOverrides = {
+  };
+  return merge(defaultConfig(), localOverrides);
+});
