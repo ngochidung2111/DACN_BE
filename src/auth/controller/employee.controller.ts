@@ -3,6 +3,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { Roles } from '../roles.decorator';
 import { RolesGuard } from '../roles.guard';
 import { ApiTags, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ROLE } from 'src/management/entity/constants';
 
 @ApiTags('employee')
 @ApiBearerAuth()
@@ -17,7 +18,7 @@ export class EmployeeController {
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('admin')
+  @Roles(ROLE.ADMIN, ROLE.MANAGER)
   @Get('admin')
   @ApiResponse({ status: 200, description: 'The admin profile.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })

@@ -9,4 +9,5 @@ export default registerAs('database', () => ({
   database: process.env.DATABASE_NAME || 'test',
   autoloadEntities: true,
   synchronize: true,
+  entities: [__dirname + '/../**/*.entity.{js,ts}']
 }));

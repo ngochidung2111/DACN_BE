@@ -1,5 +1,5 @@
 import { registerAs } from '@nestjs/config';
-import defaultConfig from './default.config';
+import defaultConfig from './auth.config';
 import { merge } from 'lodash';
 
 export default registerAs('auth', () => {

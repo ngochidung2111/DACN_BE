@@ -18,6 +18,17 @@ async function bootstrap() {
     .setTitle('OPSMATE')
     .setDescription('The OPSMATE API description')
     .setVersion('1.0')
+    .addBearerAuth( // Adds a Bearer Token authorization option
+          { 
+            type: 'http', 
+            scheme: 'bearer', 
+            bearerFormat: 'JWT', 
+            name: 'JWT', 
+            description: 'Enter JWT token', 
+            in: 'header',
+          },
+        )
+    .addSecurityRequirements('jwt')
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
