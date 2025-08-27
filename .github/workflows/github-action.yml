@@ -20,6 +20,6 @@ jobs:
         DOCKER_PASSWORD: ${{secrets.DOCKERHUB_PASSWORD}}
       run: docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
     - name: Build the Docker image
-      run: docker build -t dacn
+      run: docker build -t dacn .
     - name: Push to docker
       run: docker push $DOCKER_USERNAME/dacn:latest
