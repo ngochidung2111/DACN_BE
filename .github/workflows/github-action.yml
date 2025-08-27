@@ -22,4 +22,4 @@ jobs:
     - name: Build the Docker image
       run: docker build -t dacn .
     - name: Push to docker
-      run: docker push $DOCKER_USERNAME/dacn:latest
+      run: docker push ${{ secrets.DOCKER_USERNAME }}/dacn:latest
