@@ -15,4 +15,4 @@ jobs:
     - name: delete old container
       run: sudo docker rm -f dacn-container || true
     - name: run Docker container
-      run: sudo docker run docker run -d \ --name nestjs-app \  -p 3000:3000 \  -e DATABASE_HOST=${{secrets.DATABASE_HOST}} \  -e DATABASE_PORT=${{secrets.DATABASE_PORT}} \  -e DATABASE_USER=${{secrets.DATABASE_USER}} \  -e DATABASE_PASSWORD=${{secrets.DATABASE_PASSWORD}} \  -e DATABASE_NAME=${{secrets.DATABASE_NAME}} \ -e JWT_SECRET=${{secrets.JWT_SECRET}} \ chidung123456/dacn:latest
+      run: sudo docker run docker run -d \ --name dacn-container \  -p 3000:3000 \  -e DATABASE_HOST=${{secrets.DATABASE_HOST}} \  -e DATABASE_PORT=${{secrets.DATABASE_PORT}} \  -e DATABASE_USER=${{secrets.DATABASE_USER}} \  -e DATABASE_PASSWORD=${{secrets.DATABASE_PASSWORD}} \  -e DATABASE_NAME=${{secrets.DATABASE_NAME}} \ -e JWT_SECRET=${{secrets.JWT_SECRET}} \ chidung123456/dacn:latest
