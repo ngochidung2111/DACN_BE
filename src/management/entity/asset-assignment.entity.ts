@@ -1,6 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
-import { Asset } from './asset.entity';
+import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+
 import { Employee } from '../../auth/entity/employee.entity';
+import { Asset } from './asset.entity';
 
 @Entity()
 export class AssetAssignment {

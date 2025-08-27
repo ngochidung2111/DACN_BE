@@ -1,7 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
-import { Room } from './room.entity';
+import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+
 import { Employee } from '../../auth/entity/employee.entity';
 import { BOOKING_STATUS } from './constants';
+import { Room } from './room.entity';
 
 @Entity()
 export class Booking {

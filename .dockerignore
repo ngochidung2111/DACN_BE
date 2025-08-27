@@ -1,0 +1,8 @@
+# filepath: d:\DACN\dacn\.dockerignore
+
+node_modules
+dist
+.git
+.gitignore
+Dockerfile
+pnpm-debug.log

@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+
 import { Employee } from '../../auth/entity/employee.entity';
 import { TICKET_CATEGORY, TICKET_STATUS } from './constants';
 

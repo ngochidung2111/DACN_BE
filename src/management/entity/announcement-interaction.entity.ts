@@ -1,6 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
-import { CompanyAnnouncement } from './company-announcement.entity';
+import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+
 import { Employee } from '../../auth/entity/employee.entity';
+import { CompanyAnnouncement } from './company-announcement.entity';
 import { INTERACTION_TYPE } from './constants';
 
 @Entity()

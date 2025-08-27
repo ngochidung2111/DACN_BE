@@ -1,9 +1,11 @@
-import { Controller, Get, UseGuards, Request } from '@nestjs/common';
+import { ROLE } from 'src/management/entity/constants';
+
+import { Controller, Get, Request, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { ApiBearerAuth, ApiResponse, ApiTags } from '@nestjs/swagger';
+
 import { Roles } from '../roles.decorator';
 import { RolesGuard } from '../roles.guard';
-import { ApiTags, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { ROLE } from 'src/management/entity/constants';
 
 @ApiTags('employee')
 @ApiBearerAuth()
