@@ -39,8 +39,9 @@ async function bootstrap() {
   SwaggerModule.setup('api', app, document);
   app.useGlobalFilters(new HttpExceptionFilter());
   app.enableCors({
-    origin: 'http://localhost:3000'
-  })
+    origin: 'http://localhost:3000',
+    credentials: true,
+  });
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();
