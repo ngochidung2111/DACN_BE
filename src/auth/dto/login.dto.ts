@@ -26,3 +26,13 @@ export class LoginResponseDto {
   @ApiProperty()
   access_token: string;
 }
+
+export class RefreshTokenResponseDto {
+  @ApiProperty()
+  access_token: string;
+}
+export class RefreshTokenRequestDto{
+  @ApiProperty()
+  @IsNotEmpty({ message: 'Refresh token is required' })
+  refreshToken: string;
+}

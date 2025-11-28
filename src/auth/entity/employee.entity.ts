@@ -1,5 +1,6 @@
 import { ROLE } from 'src/management/entity/constants';
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Department } from './department.entity';
 
 @Entity()
 export class Employee {
@@ -7,14 +8,31 @@ export class Employee {
   id: string;
 
   @Column()
-  name: string;
+  lastName: string;
+
+  @Column()
+  firstName: string;
+
+  @Column()
+  middleName: string;
 
   @Column({ unique: true })
   email: string;
 
-  @Column('simple-array')
-  roles: ROLE[];
+  @Column()
+  roles: ROLE;
 
   @Column()
   password_hash: string;
+
+  @Column({nullable: true})
+  phone: string;
+
+  @Column({nullable: true})
+  salary: number;
+
+  @ManyToOne(() => Department, (department) => department.employees, { nullable: true })
+  department: Department;
+
+
 }

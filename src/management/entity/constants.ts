@@ -1,10 +1,3 @@
-export enum DEPARTMENT {
-  HR = 'HR',
-  IT = 'IT',
-  SALES = 'SALES',
-  MARKETING = 'MARKETING',
-}
-
 export enum ROLE {
   ADMIN = 'ADMIN',
   MANAGER = 'MANAGER',
@@ -23,9 +16,8 @@ export enum ASSET_CONDITION {
   RETIRED = 'RETIRED',
 }
 export enum ASSET_TYPE {
-  HARDWARE = 'HARDWARE',
-  SOFTWARE = 'SOFTWARE',
-  FURNITURE = 'FURNITURE',
+  PUBLIC = 'PUBLIC',
+  PRIVATE = 'PRIVATE',
 }
 export enum BOOKING_STATUS {
   CHECKED_IN = 'CHECKED_IN',

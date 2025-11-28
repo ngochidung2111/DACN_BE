@@ -11,6 +11,9 @@ import { JwtStrategy } from './jwt.strategy';
 import { LocalStrategy } from './local.strategy';
 import { AuthService } from './service/auth.service';
 import { EmployeeService } from './service/employee.service';
+import { DepartmentService } from './service/department.service';
+import { Department } from './entity/department.entity';
+import { DepartmentController } from './controller/department.controller';
 
 @Module({
   imports: [
@@ -23,9 +26,9 @@ import { EmployeeService } from './service/employee.service';
       }),
       inject: [ConfigService],
     }),
-    TypeOrmModule.forFeature([Employee]),
+    TypeOrmModule.forFeature([Employee, Department]),
   ],
-  providers: [AuthService, JwtStrategy, EmployeeService, LocalStrategy],
-  controllers: [AuthController, EmployeeController],
+  providers: [AuthService, JwtStrategy, EmployeeService, LocalStrategy, DepartmentService],
+  controllers: [AuthController, EmployeeController, DepartmentController],
 })
 export class AuthModule {}

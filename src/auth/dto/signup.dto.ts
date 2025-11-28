@@ -1,18 +1,37 @@
-import { IsArray, IsEmail, IsEnum, IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { IsArray, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 
 import { ApiProperty } from '@nestjs/swagger';
 
 import { ROLE } from '../../management/entity/constants';
 
+
 export class SignupRequestDto {
   @ApiProperty({
     description: 'User full name',
-    example: 'John Doe',
+    example: 'John',
   })
   @IsString({ message: 'Name must be a string' })
-  @IsNotEmpty({ message: 'Name is required' })
-  @MinLength(2, { message: 'Name must be at least 2 characters long' })
-  name: string;
+  @IsNotEmpty({ message: 'First name is required' })
+  @MinLength(2, { message: 'First name must be at least 2 characters long' })
+  firstName: string;
+
+  @ApiProperty({
+    description: 'User last name',
+    example: 'Doe',
+  })
+  @IsString({ message: 'Last name must be a string' })
+  @IsNotEmpty({ message: 'Last name is required' })
+  @MinLength(2, { message: 'Last name must be at least 2 characters long' })
+  lastName: string;
+
+  @ApiProperty({
+    description: 'User middle name',
+    example: 'Michael',
+  })
+  @IsString({ message: 'Middle name must be a string' })
+  @IsNotEmpty({ message: 'Middle name is required' })
+  @MinLength(2, { message: 'Middle name must be at least 2 characters long' })
+  middleName: string;
 
   @ApiProperty({
     description: 'User email address',
@@ -33,14 +52,19 @@ export class SignupRequestDto {
   password: string;
 
   @ApiProperty({
-    description: 'User roles',
-    example: ['EMPLOYEE'],
-    enum: ROLE,
-    isArray: true,
+    description: 'User department',
+    example: 'Engineering',
   })
-  @IsArray({ message: 'Roles must be an array' })
+  @IsString({ message: 'Department must be a string' })
+  @IsOptional()
+  department: string;
+
+  @ApiProperty({
+    description: 'User roles',
+    enum: ROLE,
+  })
   @IsEnum(ROLE, { each: true, message: 'Each role must be a valid role value' })
-  roles: ROLE[];
+  roles: ROLE;
 }
 
 export class SignupResponseDto {
@@ -51,5 +75,17 @@ export class SignupResponseDto {
   email: string;
 
   @ApiProperty()
-  roles: ROLE[];
+  firstName: string;
+
+  @ApiProperty()
+  lastName: string;
+
+  @ApiProperty()
+  middleName: string;
+
+  @ApiProperty()
+  department: string;
+
+  @ApiProperty()
+  roles: ROLE;
 }
