@@ -4,6 +4,7 @@ import { ApiProperty } from "@nestjs/swagger";
 import { Expose } from "class-transformer";
 import e from "express";
 import { IsEmail, IsString } from "class-validator";
+import { GENDER } from "../entity/constant";
 
 
 export class EmployeeDto {
@@ -34,6 +35,21 @@ export class EmployeeDto {
     })
     @Expose()
     middleName: string;
+
+    @ApiProperty({
+        description: 'User gender',
+        example: 'Male',
+    })
+    @Expose()
+    gender: GENDER;
+
+    @ApiProperty({
+        description: 'User date of birth',
+        example: '1990-01-01',
+    })
+    @Expose()
+    dateOfBirth: Date;
+
     @ApiProperty({
         description: 'User email address',
         example: 'john.doe@example.com',
@@ -103,6 +119,19 @@ export class UpdateProfileDto {
     @Expose()
     @IsString()
     phone: string;
+    @ApiProperty({
+        description: 'User gender',
+        example: 'Male',
+    })
+    @Expose()
+    gender: GENDER;
+
+    @ApiProperty({
+        description: 'User date of birth',
+        example: '1990-01-01',
+    })
+    @Expose()
+    dateOfBirth: Date;
 
 }
 

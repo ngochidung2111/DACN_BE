@@ -32,12 +32,22 @@ export class AuthController {
   @ApiBody({ type: SignupRequestDto })
   @ApiResponse({
     status: 201,
-    description: 'The user has been successfully created.',
+    description: 'The user has been successfully created and logged in.',
     type: SignupResponseDto,
   })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
-  async signup(@Body() signupDto: SignupRequestDto): Promise<SignupResponseDto> {
-    return this.authService.signup(signupDto);
+  async signup(@Body() signupDto: SignupRequestDto) {
+    // create user
+    const user = await this.authService.signup(signupDto);
+
+    // login immediately to return tokens
+    const tokens = await this.authService.login(signupDto.email, signupDto.password);
+
+    return ResponseBuilder.createResponse({
+      statusCode: 201,
+      message: 'User created and logged in',
+      data: { user, tokens },
+    });
   }
   @Post('refresh')
   @ApiBody({ type: RefreshTokenRequestDto })

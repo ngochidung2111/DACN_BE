@@ -1,6 +1,7 @@
 import { ROLE } from 'src/management/entity/constants';
 import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { Department } from './department.entity';
+import { GENDER } from './constant';
 
 @Entity()
 export class Employee {
@@ -15,6 +16,12 @@ export class Employee {
 
   @Column()
   middleName: string;
+
+  @Column()
+  gender: GENDER;
+
+  @Column()
+  dateOfBirth: Date;
 
   @Column({ unique: true })
   email: string;

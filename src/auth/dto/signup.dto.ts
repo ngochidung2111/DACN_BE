@@ -3,6 +3,7 @@ import { IsArray, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength }
 import { ApiProperty } from '@nestjs/swagger';
 
 import { ROLE } from '../../management/entity/constants';
+import { GENDER } from '../entity/constant';
 
 
 export class SignupRequestDto {
@@ -50,6 +51,20 @@ export class SignupRequestDto {
   @IsNotEmpty({ message: 'Password is required' })
   @MinLength(6, { message: 'Password must be at least 6 characters long' })
   password: string;
+
+  @ApiProperty({
+    description: 'User gender',
+    example: 'Male',
+  })
+  @IsEnum(GENDER, { message: 'Gender must be a valid value' })
+  gender: GENDER;
+
+  @ApiProperty({
+    description: 'User date of birth',
+    example: '1990-01-01',
+  })
+  @IsNotEmpty({ message: 'Date of birth is required' })
+  dateOfBirth: Date;
 
   @ApiProperty({
     description: 'User department',
