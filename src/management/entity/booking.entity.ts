@@ -30,5 +30,11 @@ export class Booking {
   status: BOOKING_STATUS;
 
   @Column({ nullable: true })
-  recurring_id: number;
+  recurring_pattern: string; // DAILY, WEEKLY, MONTHLY or null for non-recurring
+
+  @Column({ nullable: true })
+  recurring_end_date: Date; // End date for recurring bookings
+
+  @Column({ nullable: true })
+  parent_booking_id: string; // Parent ID if this is a generated recurring booking
 }

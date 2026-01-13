@@ -1,12 +1,14 @@
 import { ROLE } from 'src/management/entity/constants';
 
-import { Body, Controller, Get, NotFoundException, Param, Post, Request, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, Post, Request, Res, UseGuards, Query } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiBody, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiResponse, ApiTags, ApiQuery } from '@nestjs/swagger';
 
 import { Roles } from '../roles.decorator';
 import { RolesGuard } from '../roles.guard';
 import { EmployeeService } from '../service/employee.service';
+import { QueryEmployeeDto } from '../dto/query-employee.dto';
+import { EmployeeListResponseDto } from '../dto/employee-list-response.dto';
 
 import { plainToInstance } from 'class-transformer';
 import { EmployeeDto, UpdateProfileDto } from '../dto/employee.dto';
@@ -45,15 +47,25 @@ export class EmployeeController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(ROLE.ADMIN, ROLE.MANAGER)
   @Get('all')
-  @ApiResponse({ status: 200, description: 'List of all employees.', type: [EmployeeDto] })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'pageSize', required: false, example: 20 })
+  @ApiQuery({ name: 'role', required: false, example: 'EMPLOYEE' })
+  @ApiQuery({ name: 'department', required: false, example: 'Engineering' })
+  @ApiQuery({ name: 'search', required: false, example: 'john' })
+  @ApiResponse({ status: 200, description: 'List of all employees.', type: EmployeeListResponseDto })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
-  async getallEmployees() {
-    const employees = await this.employeeService.findAll();
+  async getallEmployees(@Query() query: QueryEmployeeDto) {
+    const { data, total, page, pageSize } = await this.employeeService.findAllWithQuery(query as any);
     return ResponseBuilder.createResponse({
       statusCode: 200,
       message: 'Employees retrieved successfully',
-      data: plainToInstance(EmployeeDto, employees, { excludeExtraneousValues: true }),
+      data: {
+        items: plainToInstance(EmployeeDto, data, { excludeExtraneousValues: true }),
+        total,
+        page,
+        pageSize,
+      },
     });
   }
 
@@ -71,18 +83,18 @@ export class EmployeeController {
     const updatedEmployee = await this.employeeService.update(req.user.email, updateProfileDto);
     return plainToInstance(EmployeeDto, updatedEmployee, { excludeExtraneousValues: true });
   }
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(ROLE.ADMIN, ROLE.MANAGER)
-  @Get('department/:name')
-  async getEmployeesByDepartment(@Request() req, @Param('name') name: string) {
-    const departmentName = req.params.name;
-    const employees = await this.employeeService.findByDepartment(departmentName);
-    return ResponseBuilder.createResponse({
-      statusCode: 200,
-      message: 'Employees retrieved successfully',
-      data: plainToInstance(EmployeeDto, employees, { excludeExtraneousValues: true }),
-    });
-  }
+  // @UseGuards(AuthGuard('jwt'), RolesGuard)
+  // @Roles(ROLE.ADMIN, ROLE.MANAGER)
+  // @Get('department/:name')
+  // async getEmployeesByDepartment(@Request() req, @Param('name') name: string) {
+  //   const departmentName = req.params.name;
+  //   const employees = await this.employeeService.findByDepartment(departmentName);
+  //   return ResponseBuilder.createResponse({
+  //     statusCode: 200,
+  //     message: 'Employees retrieved successfully',
+  //     data: plainToInstance(EmployeeDto, employees, { excludeExtraneousValues: true }),
+  //   });
+  // }
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(ROLE.ADMIN, ROLE.MANAGER)
   @Get('department')
