@@ -30,5 +30,6 @@ import { DepartmentController } from './controller/department.controller';
   ],
   providers: [AuthService, JwtStrategy, EmployeeService, LocalStrategy, DepartmentService],
   controllers: [AuthController, EmployeeController, DepartmentController],
+  exports: [EmployeeService, DepartmentService],
 })
 export class AuthModule {}

@@ -8,6 +8,7 @@ import { SignupRequestDto } from '../dto/signup.dto';
 import { Employee } from '../entity/employee.entity';
 import { DepartmentService } from './department.service';
 import { UpdateProfileDto } from '../dto/employee.dto';
+import { Like } from 'typeorm';
 
 @Injectable()
 export class EmployeeService {
@@ -30,6 +31,36 @@ export class EmployeeService {
   }
   async findAll(): Promise<Employee[]> {
     return await this.employeeRepository.find({ relations: ['department'] });
+  }
+
+  async findAllWithQuery(options: {
+    page?: number;
+    pageSize?: number;
+    role?: string;
+    department?: string;
+    search?: string;
+  }): Promise<{ data: Employee[]; total: number; page: number; pageSize: number }> {
+    const page = options.page && options.page > 0 ? options.page : 1;
+    const pageSize = options.pageSize && options.pageSize > 0 ? options.pageSize : 20;
+
+    const qb = this.employeeRepository.createQueryBuilder('employee').leftJoinAndSelect('employee.department', 'department');
+
+    if (options.role) {
+      qb.andWhere('employee.roles = :role', { role: options.role });
+    }
+
+    if (options.department) {
+      qb.andWhere('department.name = :dept', { dept: options.department });
+    }
+
+    if (options.search) {
+      const s = `%${options.search}%`;
+      qb.andWhere('(employee.firstName LIKE :s OR employee.lastName LIKE :s OR employee.email LIKE :s)', { s });
+    }
+
+    const [data, total] = await qb.skip((page - 1) * pageSize).take(pageSize).getManyAndCount();
+
+    return { data, total, page, pageSize };
   }
   async create(employeeData: SignupRequestDto): Promise<Employee> {
     let department;
@@ -74,5 +105,12 @@ export class EmployeeService {
       throw new NotFoundException ('Department not found');
     }
     return await this.employeeRepository.find({ where: { department: { id: department.id } }, relations: ['department'] });
+  }
+  async findById(id: string): Promise<Employee> {
+    const employee = await this.employeeRepository.findOne({ where: { id }, relations: ['department'] });
+    if (!employee) {
+      throw new NotFoundException('Employee not found');
+    }
+    return employee;
   }
 }
