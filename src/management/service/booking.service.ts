@@ -9,6 +9,7 @@ import { plainToInstance } from 'class-transformer';
 import { EmployeeService } from 'src/auth/service/employee.service';
 import { Employee } from 'src/auth/entity/employee.entity';
 import e from 'express';
+import { BookingResponseShortDto } from '../dto/booking-response-short.dto';
 
 @Injectable()
 export class BookingService {
@@ -216,7 +217,7 @@ export class BookingService {
     employeeId?: string,
     status?: BOOKING_STATUS,
     includeOnlyParent?: boolean,
-  ): Promise<BookingResponseDto[]> {
+  ) {
     let query = this.bookingRepository
       .createQueryBuilder('booking')
       .leftJoinAndSelect('booking.room', 'room')
@@ -243,9 +244,7 @@ export class BookingService {
 
     const bookings = await query.getMany();
 
-    return plainToInstance(BookingResponseDto, bookings, {
-      excludeExtraneousValues: true,
-    });
+    return this.mapToBookingResponseShort(bookings);
   }
 
   // Lấy booking theo ID
@@ -348,8 +347,38 @@ export class BookingService {
     });
   }
 
-  // Helper function
-  private generateRecurringId(): number {
-    return Math.floor(Date.now() / 1000);
+  async findByRoom(roomId: string) {
+    const bookings = await this.bookingRepository.find({
+      where: { room: { id: roomId } },
+      relations: ['room', 'employee'],
+    });
+    return this.mapToBookingResponseShort(bookings);
+  }
+
+  // Map booking entity to booking response short DTO
+  mapToBookingResponseShort(booking: Booking): BookingResponseShortDto;
+  mapToBookingResponseShort(bookings: Booking[]): BookingResponseShortDto[];
+  mapToBookingResponseShort(bookingOrBookings: Booking | Booking[]): BookingResponseShortDto | BookingResponseShortDto[] {
+    // Nếu là array thì map từng phần tử
+    if (Array.isArray(bookingOrBookings)) {
+      return bookingOrBookings.map(booking => {
+        const dto = new BookingResponseShortDto();
+        dto.id = booking.id;
+        dto.startTime = booking.start_time;
+        dto.endTime = booking.end_time;
+        dto.name = booking.employee?.firstName + ' '+ booking.employee?.middleName + ' ' + booking.employee?.lastName  || 'Unknown';
+        dto.roomName = booking.room?.name;
+        return dto;
+      });
+    }
+
+    // Nếu là object đơn lẻ
+    const dto = new BookingResponseShortDto();
+    dto.id = bookingOrBookings.id;
+    dto.startTime = bookingOrBookings.start_time;
+    dto.endTime = bookingOrBookings.end_time;
+    dto.name = bookingOrBookings.employee?.firstName + ' '+ bookingOrBookings.employee?.middleName + ' ' + bookingOrBookings.employee?.lastName  || 'Unknown';
+    dto.roomName = bookingOrBookings.room?.name;
+    return dto;
   }
 }

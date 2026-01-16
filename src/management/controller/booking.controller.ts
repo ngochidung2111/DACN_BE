@@ -4,6 +4,7 @@ import { BookingService } from '../service/booking.service';
 import { CreateBookingDto, UpdateBookingDto, BookingResponseDto } from '../dto';
 import { RolesGuard } from 'src/auth/roles.guard';
 import { AuthGuard } from '@nestjs/passport';
+import { ResponseBuilder } from 'src/lib/dto/response-builder.dto';
 
 @ApiTags('Bookings')
 @Controller('bookings')
@@ -206,5 +207,21 @@ export class BookingController {
       success: true,
       available: isAvailable,
     };
+  }
+  @ApiOperation({ summary: 'Lấy bookings theo phòng' })
+  @ApiParam({ name: 'roomId', description: 'Room ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of bookings for room',
+    type: [BookingResponseDto],
+  })
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Get('by-room/:roomId')
+  async findByRoom(@Param('roomId') roomId: string) {
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'Bookings retrieved successfully',
+      data: await this.bookingService.findByRoom(roomId),
+    });
   }
 }
