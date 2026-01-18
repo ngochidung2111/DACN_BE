@@ -13,4 +13,10 @@ export class Room {
 
   @Column('simple-array')
   equipment: string[];
+
+  @Column({ nullable: true })
+  imageUrl?: string;
+
+  @Column({ nullable: true })
+  imageKey?: string;
 }

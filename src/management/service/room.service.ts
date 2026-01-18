@@ -3,17 +3,19 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, MoreThanOrEqual } from 'typeorm';
 import { Room } from '../entity/room.entity';
 import { CreateRoomDto, UpdateRoomDto } from '../dto';
+import { S3Service } from './s3.service';
 
 @Injectable()
 export class RoomService {
   constructor(
     @InjectRepository(Room)
     private roomRepository: Repository<Room>,
+    private readonly s3Service: S3Service,
   ) {}
 
   // Tạo phòng mới
   async createRoom(createRoomDto: CreateRoomDto): Promise<Room> {
-    const { name, capacity, equipment } = createRoomDto;
+    const { name, capacity, equipment, imageKey, imageUrl } = createRoomDto;
 
     if (!name || name.trim() === '') {
       throw new BadRequestException('Room name is required');
@@ -27,6 +29,8 @@ export class RoomService {
       name,
       capacity,
       equipment: equipment || [],
+      imageKey,
+      imageUrl,
     });
 
     return this.roomRepository.save(room);
@@ -74,6 +78,14 @@ export class RoomService {
       room.equipment = updateRoomDto.equipment;
     }
 
+    if (updateRoomDto.imageKey !== undefined) {
+      room.imageKey = updateRoomDto.imageKey;
+    }
+
+    if (updateRoomDto.imageUrl !== undefined) {
+      room.imageUrl = updateRoomDto.imageUrl;
+    }
+
     return this.roomRepository.save(room);
   }
 
@@ -100,5 +112,47 @@ export class RoomService {
       },
       order: { capacity: 'ASC' },
     });
+  }
+
+  async createRoomImageUploadUrl(roomId: string, fileName: string, fileType: string) {
+    const room = await this.getRoomById(roomId);
+
+    if (!fileName || !fileType) {
+      throw new BadRequestException('fileName and fileType are required');
+    }
+
+    const safeFileName = fileName.replace(/\s+/g, '-');
+    const key = `rooms/${room.id}/${Date.now()}-${safeFileName}`;
+
+    const { uploadUrl, fileUrl } = await this.s3Service.createUploadUrl({
+      key,
+      contentType: fileType,
+    });
+
+    room.imageKey = key;
+    room.imageUrl = fileUrl;
+    await this.roomRepository.save(room);
+
+    return {
+      uploadUrl,
+      fileUrl,
+      key,
+      roomId: room.id,
+    };
+  }
+
+  async getRoomImageReadUrl(roomId: string) {
+    const room = await this.getRoomById(roomId);
+
+    if (!room.imageKey) {
+      throw new NotFoundException('Room does not have an image');
+    }
+
+    const readUrl = await this.s3Service.createReadUrl(room.imageKey);
+
+    return {
+      roomId: room.id,
+      readUrl,
+    };
   }
 }

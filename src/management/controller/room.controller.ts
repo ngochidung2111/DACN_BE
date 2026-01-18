@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { RoomService } from '../service/room.service';
-import { CreateRoomDto, UpdateRoomDto, RoomResponseDto } from '../dto';
+import { CreateRoomDto, UpdateRoomDto, RoomResponseDto, RoomImageUploadDto } from '../dto';
 import { RolesGuard } from 'src/auth/roles.guard';
 import { Roles } from 'src/auth/roles.decorator';
 import { AuthGuard } from '@nestjs/passport';
@@ -55,6 +55,22 @@ export class RoomController {
     };
   }
 
+  // Lấy URL tạm thời để xem ảnh phòng
+  @ApiOperation({ summary: 'Lấy URL tạm thời để xem ảnh phòng' })
+  @ApiParam({ name: 'id', description: 'Room ID' })
+  @ApiResponse({ status: 200, description: 'Temporary read URL' })
+  @ApiResponse({ status: 404, description: 'Room or image not found' })
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(ROLE.ADMIN)
+  @Get(':id/image')
+  async getRoomImage(@Param('id') roomId: string) {
+    const result = await this.roomService.getRoomImageReadUrl(roomId);
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
   // Lấy phòng theo ID
   @ApiOperation({ summary: 'Lấy thông tin phòng theo ID' })
   @ApiParam({ name: 'id', description: 'Room ID' })
@@ -73,6 +89,31 @@ export class RoomController {
     return {
       success: true,
       data: room,
+    };
+  }
+
+  // Tạo URL upload ảnh phòng lên S3
+  @ApiOperation({ summary: 'Tạo URL upload ảnh phòng lên S3' })
+  @ApiParam({ name: 'id', description: 'Room ID' })
+  @ApiBody({ type: RoomImageUploadDto })
+  @ApiResponse({ status: 200, description: 'Presigned upload URL created' })
+  @ApiResponse({ status: 404, description: 'Room not found' })
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(ROLE.ADMIN)
+  @Post(':id/image/upload-url')
+  async createRoomImageUploadUrl(
+    @Param('id') roomId: string,
+    @Body() payload: RoomImageUploadDto,
+  ) {
+    const data = await this.roomService.createRoomImageUploadUrl(
+      roomId,
+      payload.fileName,
+      payload.fileType,
+    );
+
+    return {
+      success: true,
+      data,
     };
   }
 
