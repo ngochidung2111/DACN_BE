@@ -12,4 +12,10 @@ export class RoomResponseDto {
 
   @ApiProperty({ description: 'Room equipment', example: ['Projector', 'Whiteboard', 'AC'] })
   equipment: string[];
+
+  @ApiProperty({ description: 'Public URL of room image', example: 'https://bucket.s3.ap-southeast-1.amazonaws.com/rooms/123/abc.jpg', required: false })
+  imageUrl?: string;
+
+  @ApiProperty({ description: 'S3 object key of room image', example: 'rooms/123/abc.jpg', required: false })
+  imageKey?: string;
 }

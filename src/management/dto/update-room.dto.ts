@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNumber, IsArray, IsOptional, Min } from 'class-validator';
+import { IsString, IsNumber, IsArray, IsOptional, Min, IsUrl } from 'class-validator';
 
 export class UpdateRoomDto {
   @ApiProperty({ description: 'Room name', example: 'Meeting Room A', required: false })
@@ -21,4 +21,14 @@ export class UpdateRoomDto {
   @IsArray()
   @IsOptional()
   equipment?: string[];
+
+  @ApiProperty({ description: 'Public URL of room image (after upload)', example: 'https://bucket.s3.ap-southeast-1.amazonaws.com/rooms/123/abc.jpg', required: false })
+  @IsUrl()
+  @IsOptional()
+  imageUrl?: string;
+
+  @ApiProperty({ description: 'S3 object key of room image', example: 'rooms/123/abc.jpg', required: false })
+  @IsString()
+  @IsOptional()
+  imageKey?: string;
 }
