@@ -19,4 +19,7 @@ export class Room {
 
   @Column({ nullable: true })
   imageKey?: string;
+
+  @Column({ nullable: true })
+  location?: string;
 }
