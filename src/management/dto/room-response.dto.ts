@@ -18,4 +18,7 @@ export class RoomResponseDto {
 
   @ApiProperty({ description: 'S3 object key of room image', example: 'rooms/123/abc.jpg', required: false })
   imageKey?: string;
+
+  @ApiProperty({ description: 'Room location/address', example: 'Building A, Floor 3', required: false })
+  location?: string;
 }

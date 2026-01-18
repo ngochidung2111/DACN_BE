@@ -15,7 +15,7 @@ export class RoomService {
 
   // Tạo phòng mới
   async createRoom(createRoomDto: CreateRoomDto): Promise<Room> {
-    const { name, capacity, equipment, imageKey, imageUrl } = createRoomDto;
+    const { name, capacity, equipment, imageKey, imageUrl, location } = createRoomDto;
 
     if (!name || name.trim() === '') {
       throw new BadRequestException('Room name is required');
@@ -31,6 +31,7 @@ export class RoomService {
       equipment: equipment || [],
       imageKey,
       imageUrl,
+      location,
     });
 
     return this.roomRepository.save(room);
@@ -84,6 +85,10 @@ export class RoomService {
 
     if (updateRoomDto.imageUrl !== undefined) {
       room.imageUrl = updateRoomDto.imageUrl;
+    }
+
+    if (updateRoomDto.location !== undefined) {
+      room.location = updateRoomDto.location;
     }
 
     return this.roomRepository.save(room);

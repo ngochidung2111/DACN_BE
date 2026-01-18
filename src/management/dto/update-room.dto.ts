@@ -31,4 +31,9 @@ export class UpdateRoomDto {
   @IsString()
   @IsOptional()
   imageKey?: string;
+
+  @ApiProperty({ description: 'Room location/address', example: 'Building A, Floor 3', required: false })
+  @IsString()
+  @IsOptional()
+  location?: string;
 }
