@@ -80,7 +80,23 @@ export class BookingController {
       total: bookings.length,
     };
   }
-
+  @ApiOperation({ summary: 'Lấy bookings theo nhân viên' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of bookings for employee',
+    type: [BookingResponseDto],
+  })
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Get('by-employee')
+  async findByEmployee(@Request() req) {
+    const employeeId = req.user.userId;
+    const bookings = await this.bookingService.findByEmployee(employeeId);
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'Bookings retrieved successfully',
+      data: bookings,
+    });
+  }
   // Lấy booking theo ID
   @ApiOperation({ summary: 'Lấy thông tin booking theo ID' })
   @ApiParam({ name: 'id', description: 'Booking ID' })
@@ -224,4 +240,6 @@ export class BookingController {
       data: await this.bookingService.findByRoom(roomId),
     });
   }
+
+  
 }
