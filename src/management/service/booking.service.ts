@@ -354,7 +354,13 @@ export class BookingService {
     });
     return this.mapToBookingResponseShort(bookings);
   }
-
+  async findByEmployee(employeeId: string) {
+    const bookings = await this.bookingRepository.find({
+      where: { employee: { id: employeeId } },
+      relations: ['room', 'employee'],
+    });
+    return this.mapToBookingResponseShort(bookings);
+  }
   // Map booking entity to booking response short DTO
   mapToBookingResponseShort(booking: Booking): BookingResponseShortDto;
   mapToBookingResponseShort(bookings: Booking[]): BookingResponseShortDto[];
