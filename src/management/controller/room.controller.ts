@@ -24,7 +24,7 @@ export class RoomController {
   @ApiResponse({ status: 400, description: 'Bad Request - Invalid data' })
   @ApiResponse({ status: 401, description: 'Unauthorized - Admin only' })
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(ROLE.ADMIN)
+  @Roles(ROLE.ADMIN, ROLE.MANAGER)
   @Post()
   async createRoom(@Body() createRoomDto: CreateRoomDto) {
     const room = await this.roomService.createRoom(createRoomDto);
@@ -44,7 +44,6 @@ export class RoomController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized - Admin only' })
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(ROLE.ADMIN)
   @Get()
   async getAllRooms() {
     const rooms = await this.roomService.getAllRooms();
@@ -61,7 +60,6 @@ export class RoomController {
   @ApiResponse({ status: 200, description: 'Temporary read URL' })
   @ApiResponse({ status: 404, description: 'Room or image not found' })
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(ROLE.ADMIN)
   @Get(':id/image')
   async getRoomImage(@Param('id') roomId: string) {
     const result = await this.roomService.getRoomImageReadUrl(roomId);
@@ -82,7 +80,6 @@ export class RoomController {
   @ApiResponse({ status: 404, description: 'Room not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized - Admin only' })
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(ROLE.ADMIN)
   @Get(':id')
   async getRoomById(@Param('id') roomId: string) {
     const room = await this.roomService.getRoomById(roomId);

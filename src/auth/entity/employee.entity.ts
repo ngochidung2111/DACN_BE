@@ -36,7 +36,22 @@ export class Employee {
   phone: string;
 
   @Column({nullable: true})
-  salary: number;
+  basicSalary: number;
+
+  @Column({nullable: true})
+  grossSalary: number;
+
+  @Column({nullable: true})
+  signDate: Date;
+
+  @Column({nullable: true})
+  quitDate: Date;
+
+  @Column({nullable: true})
+  idCard: string;
+
+  @Column({nullable: true})
+  address: string;
 
   @ManyToOne(() => Department, (department) => department.employees, { nullable: true })
   department: Department;
