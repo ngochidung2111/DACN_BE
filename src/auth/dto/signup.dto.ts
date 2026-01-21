@@ -67,12 +67,40 @@ export class SignupRequestDto {
   dateOfBirth: Date;
 
   @ApiProperty({
+    description: 'User phone number',
+    example: '+1234567890',
+    required: false,
+  })
+  @IsString({ message: 'Phone must be a string' })
+  @IsOptional()
+  phone?: string;
+
+  @ApiProperty({
+    description: 'ID card number',
+    example: '123456789',
+    required: false,
+  })
+  @IsString({ message: 'ID card must be a string' })
+  @IsOptional()
+  idCard?: string;
+
+  @ApiProperty({
+    description: 'Employee address',
+    example: '123 Main St, City, Country',
+    required: false,
+  })
+  @IsString({ message: 'Address must be a string' })
+  @IsOptional()
+  address?: string;
+
+  @ApiProperty({
     description: 'User department',
     example: 'Engineering',
+    required: false,
   })
   @IsString({ message: 'Department must be a string' })
   @IsOptional()
-  department: string;
+  department?: string;
 
   @ApiProperty({
     description: 'User roles',

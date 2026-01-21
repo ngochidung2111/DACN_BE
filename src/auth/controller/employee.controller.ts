@@ -1,6 +1,6 @@
 import { ROLE } from 'src/management/entity/constants';
 
-import { Body, Controller, Get, NotFoundException, Param, Post, Request, Res, UseGuards, Query } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, Post, Request, Res, UseGuards, Query, Patch } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiBody, ApiResponse, ApiTags, ApiQuery } from '@nestjs/swagger';
 
@@ -11,7 +11,7 @@ import { QueryEmployeeDto } from '../dto/query-employee.dto';
 import { EmployeeListResponseDto } from '../dto/employee-list-response.dto';
 
 import { plainToInstance } from 'class-transformer';
-import { EmployeeDto, UpdateProfileDto } from '../dto/employee.dto';
+import { AdminUpdateEmployeeDto, EmployeeDto, UpdateProfileDto } from '../dto/employee.dto';
 import { ResponseBuilder } from 'src/lib/dto/response-builder.dto';
 
 @ApiTags('employee')
@@ -66,6 +66,23 @@ export class EmployeeController {
         page,
         pageSize,
       },
+    });
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(ROLE.ADMIN)
+  @Patch('by-admin/:id')
+  @ApiBody({ type: AdminUpdateEmployeeDto })
+  @ApiResponse({ status: 200, description: 'Employee updated successfully.', type: EmployeeDto })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @ApiResponse({ status: 404, description: 'Employee not found.' })
+  async updateEmployeeByAdmin(@Param('id') id: string, @Body() body: AdminUpdateEmployeeDto) {
+    const updated = await this.employeeService.updateByAdmin(id, body);
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'Employee updated successfully',
+      data: plainToInstance(EmployeeDto, updated, { excludeExtraneousValues: true }),
     });
   }
 

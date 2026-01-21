@@ -7,8 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { SignupRequestDto } from '../dto/signup.dto';
 import { Employee } from '../entity/employee.entity';
 import { DepartmentService } from './department.service';
-import { UpdateProfileDto } from '../dto/employee.dto';
-import { Like } from 'typeorm';
+import { AdminUpdateEmployeeDto, UpdateProfileDto } from '../dto/employee.dto';
 
 @Injectable()
 export class EmployeeService {
@@ -85,6 +84,26 @@ export class EmployeeService {
     }
     Object.assign(existingEmployee, employee);
     return await this.employeeRepository.save(existingEmployee);
+  }
+
+  async updateByAdmin(id: string, dto: AdminUpdateEmployeeDto): Promise<Employee> {
+    const employee = await this.findById(id);
+
+    if (dto.email && dto.email !== employee.email) {
+      if (await this.checkEmail(dto.email)) {
+        throw new UnauthorizedException('Email already in use');
+      }
+    }
+
+    if (dto.departmentName) {
+      const department = await this.departmentService.findByName(dto.departmentName);
+      employee.department = department;
+    }
+
+    const { departmentName, ...rest } = dto;
+    Object.assign(employee, rest);
+
+    return await this.employeeRepository.save(employee);
   }
   async updateDepartment(email: string, departmentName: string): Promise<Employee> {
     const employee = await this.findOneByEmail(email);
