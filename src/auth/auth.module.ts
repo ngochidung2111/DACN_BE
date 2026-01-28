@@ -7,6 +7,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthController } from './controller/auth.controller';
 import { EmployeeController } from './controller/employee.controller';
 import { Employee } from './entity/employee.entity';
+import { Degree } from './entity/degree.entity';
 import { JwtStrategy } from './jwt.strategy';
 import { LocalStrategy } from './local.strategy';
 import { AuthService } from './service/auth.service';
@@ -26,7 +27,7 @@ import { DepartmentController } from './controller/department.controller';
       }),
       inject: [ConfigService],
     }),
-    TypeOrmModule.forFeature([Employee, Department]),
+    TypeOrmModule.forFeature([Employee, Department, Degree]),
   ],
   providers: [AuthService, JwtStrategy, EmployeeService, LocalStrategy, DepartmentService],
   controllers: [AuthController, EmployeeController, DepartmentController],

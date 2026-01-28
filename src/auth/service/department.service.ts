@@ -18,7 +18,6 @@ export class DepartmentService {
   async findById(id: string): Promise<Department> {
     const result = await this.departmentRepository.findOne({
       where: { id },
-      relations: ['employees'],
     });
     if (!result) {
       throw new NotFoundException({code: 'DEPARTMENT_NOT_FOUND', message: 'Department not found'});

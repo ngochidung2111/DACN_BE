@@ -6,30 +6,33 @@ import { InjectRepository } from '@nestjs/typeorm';
 
 import { SignupRequestDto } from '../dto/signup.dto';
 import { Employee } from '../entity/employee.entity';
+import { Degree } from '../entity/degree.entity';
 import { DepartmentService } from './department.service';
-import { AdminUpdateEmployeeDto, UpdateProfileDto } from '../dto/employee.dto';
+import { AdminUpdateEmployeeDto, UpdateProfileDto, DegreeInputDto } from '../dto/employee.dto';
 
 @Injectable()
 export class EmployeeService {
   constructor(
     @InjectRepository(Employee)
     private readonly employeeRepository: Repository<Employee>,
+    @InjectRepository(Degree)
+    private readonly degreeRepository: Repository<Degree>,
     private readonly departmentService: DepartmentService,
   ) {}
-  async findOneById(id: string): Promise<Employee | null> {
-    const result = await this.employeeRepository.findOne({ where: { id } });
+  async findOneById(id: string): Promise<Employee> {
+    const result = await this.employeeRepository.findOne({ where: { id }, relations: ['department', 'degrees'] });
     if (!result)
       throw new UnauthorizedException('Invalid credentials');
     return result;
   }
-  async findOneByEmail(email: string): Promise<Employee | null> {
-    const result = await this.employeeRepository.findOne({ where: { email } , relations: ['department'] });
+  async findOneByEmail(email: string): Promise<Employee> {
+    const result = await this.employeeRepository.findOne({ where: { email }, relations: ['department', 'degrees'] });
     if (!result)
       throw new UnauthorizedException('Invalid credentials');
     return result;
   }
   async findAll(): Promise<Employee[]> {
-    return await this.employeeRepository.find({ relations: ['department'] });
+    return await this.employeeRepository.find({ relations: ['department', 'degrees'] });
   }
 
   async findAllWithQuery(options: {
@@ -79,11 +82,13 @@ export class EmployeeService {
   async update(email: string, employee: UpdateProfileDto): Promise<Employee> {
     const existingEmployee = await this.findOneByEmail(email);
     
-    if (!existingEmployee) {
-      throw new UnauthorizedException('Employee not found');
+    const { degrees, ...rest } = employee;
+    Object.assign(existingEmployee, rest);
+    const saved = await this.employeeRepository.save(existingEmployee);
+    if (degrees && degrees.length > 0) {
+      await this.updateDegrees(saved, degrees);
     }
-    Object.assign(existingEmployee, employee);
-    return await this.employeeRepository.save(existingEmployee);
+    return await this.findOneByEmail(email);
   }
 
   async updateByAdmin(id: string, dto: AdminUpdateEmployeeDto): Promise<Employee> {
@@ -100,16 +105,17 @@ export class EmployeeService {
       employee.department = department;
     }
 
-    const { departmentName, ...rest } = dto;
+    const { departmentName, degrees, ...rest } = dto;
     Object.assign(employee, rest);
 
-    return await this.employeeRepository.save(employee);
+    const saved = await this.employeeRepository.save(employee);
+    if (degrees && degrees.length > 0) {
+      await this.updateDegrees(saved, degrees);
+    }
+    return await this.findById(id);
   }
   async updateDepartment(email: string, departmentName: string): Promise<Employee> {
     const employee = await this.findOneByEmail(email);
-    if (!employee) {
-      throw new UnauthorizedException('Employee not found');
-    }
     const department = await this.departmentService.findByName(departmentName);
     employee.department = department;
     return await this.employeeRepository.save(employee);
@@ -126,10 +132,21 @@ export class EmployeeService {
     return await this.employeeRepository.find({ where: { department: { id: department.id } }, relations: ['department'] });
   }
   async findById(id: string): Promise<Employee> {
-    const employee = await this.employeeRepository.findOne({ where: { id }, relations: ['department'] });
+    const employee = await this.employeeRepository.findOne({ where: { id }, relations: ['department', 'degrees'] });
     if (!employee) {
       throw new NotFoundException('Employee not found');
     }
     return employee;
+  }
+
+  private async updateDegrees(employee: Employee, degrees: DegreeInputDto[]): Promise<void> {
+    if (!degrees || degrees.length === 0) {
+      return;
+    }
+    // Remove all existing degrees
+    await this.degreeRepository.delete({ employee: { id: employee.id } });
+    // Create new degrees
+    const newDegrees = degrees.map(deg => this.degreeRepository.create({ ...deg, employee }));
+    await this.degreeRepository.save(newDegrees);
   }
 }
