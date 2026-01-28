@@ -2,8 +2,62 @@ import { ROLE } from "src/management/entity/constants";
 import { Department } from "../entity/department.entity";
 import { ApiProperty } from "@nestjs/swagger";
 import { Expose, Type } from "class-transformer";
-import { IsEmail, IsEnum, IsNumber, IsOptional, IsString } from "class-validator";
+import { IsBoolean, IsEmail, IsEnum, IsNumber, IsOptional, IsString } from "class-validator";
 import { GENDER } from "../entity/constant";
+
+export class DegreeDto {
+    @ApiProperty({ description: 'Degree ID', example: 'uuid-123' })
+    @Expose()
+    id: string;
+
+    @ApiProperty({ description: 'School name', example: 'MIT' })
+    @Expose()
+    school: string;
+
+    @ApiProperty({ description: 'Degree name', example: 'Bachelor of Science' })
+    @Expose()
+    degree: string;
+
+    @ApiProperty({ description: 'Field of study', example: 'Computer Science' })
+    @Expose()
+    fieldOfStudy: string;
+
+    @ApiProperty({ description: 'Graduation year', example: 2022 })
+    @Expose()
+    graduationYear: number;
+
+    @ApiProperty({ description: 'Additional notes', example: 'Graduated with honors', required: false })
+    @Expose()
+    description?: string;
+}
+
+export class DegreeInputDto {
+    @ApiProperty({ description: 'School name', example: 'MIT', required: false })
+    @IsString()
+    @IsOptional()
+    school?: string;
+
+    @ApiProperty({ description: 'Degree name', example: 'Bachelor of Science', required: false })
+    @IsString()
+    @IsOptional()
+    degree?: string;
+
+    @ApiProperty({ description: 'Field of study', example: 'Computer Science', required: false })
+    @IsString()
+    @IsOptional()
+    fieldOfStudy?: string;
+
+    @ApiProperty({ description: 'Graduation year', example: 2022, required: false })
+    @Type(() => Number)
+    @IsNumber()
+    @IsOptional()
+    graduationYear?: number;
+
+    @ApiProperty({ description: 'Additional notes', example: 'Graduated with honors', required: false })
+    @IsString()
+    @IsOptional()
+    description?: string;
+}
 
 
 export class EmployeeDto {
@@ -119,6 +173,18 @@ export class EmployeeDto {
     @Expose()
     address?: string;
 
+    @ApiProperty({ description: 'Marital status', example: true, required: false })
+    @Expose()
+    marriedStatus?: boolean;
+
+    @ApiProperty({ description: 'Number of children', example: 2, required: false })
+    @Expose()
+    numberOfChildren?: number;
+
+    @ApiProperty({ description: 'Children information', example: 'Two kids, ages 5 and 8', required: false })
+    @Expose()
+    childrenDescription?: string;
+
     @ApiProperty({
         description: 'Department of the employee',
         example: 'Sales',
@@ -126,6 +192,11 @@ export class EmployeeDto {
     })
     @Expose()
     department?: Department;
+
+    @ApiProperty({ description: 'Employee degrees', required: false, type: () => [DegreeDto] })
+    @Expose()
+    @Type(() => DegreeDto)
+    degrees?: DegreeDto[];
 }
 
 export class UpdateProfileDto {
@@ -207,6 +278,31 @@ export class UpdateProfileDto {
     @IsString()
     @IsOptional()
     address?: string;
+
+    @ApiProperty({ description: 'Marital status', example: true, required: false })
+    @Expose()
+    @IsBoolean()
+    @IsOptional()
+    marriedStatus?: boolean;
+
+    @ApiProperty({ description: 'Number of children', example: 2, required: false })
+    @Expose()
+    @Type(() => Number)
+    @IsNumber()
+    @IsOptional()
+    numberOfChildren?: number;
+
+    @ApiProperty({ description: 'Children information', example: 'Two kids, ages 5 and 8', required: false })
+    @Expose()
+    @IsString()
+    @IsOptional()
+    childrenDescription?: string;
+
+    @ApiProperty({ description: 'Employee degrees', required: false, type: () => [DegreeInputDto] })
+    @Expose()
+    @Type(() => DegreeInputDto)
+    @IsOptional()
+    degrees?: DegreeInputDto[];
 
 }
 
@@ -312,4 +408,29 @@ export class AdminUpdateEmployeeDto {
     @IsString()
     @IsOptional()
     departmentName?: string;
+
+    @ApiProperty({ description: 'Marital status', example: true, required: false })
+    @Expose()
+    @IsBoolean()
+    @IsOptional()
+    marriedStatus?: boolean;
+
+    @ApiProperty({ description: 'Number of children', example: 2, required: false })
+    @Expose()
+    @Type(() => Number)
+    @IsNumber()
+    @IsOptional()
+    numberOfChildren?: number;
+
+    @ApiProperty({ description: 'Children information', example: 'Two kids, ages 5 and 8', required: false })
+    @Expose()
+    @IsString()
+    @IsOptional()
+    childrenDescription?: string;
+
+    @ApiProperty({ description: 'Employee degrees', required: false, type: () => [DegreeInputDto] })
+    @Expose()
+    @Type(() => DegreeInputDto)
+    @IsOptional()
+    degrees?: DegreeInputDto[];
 }

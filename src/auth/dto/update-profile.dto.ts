@@ -1,6 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { Expose } from "class-transformer";
-import { IsString, IsOptional } from "class-validator";
+import { Expose, Type } from "class-transformer";
+import { IsBoolean, IsNumber, IsOptional, IsString } from "class-validator";
 import { GENDER } from "../entity/constant";
 
 export class UpdateProfileDto {
@@ -82,5 +82,24 @@ export class UpdateProfileDto {
     @IsString()
     @IsOptional()
     address?: string;
+
+    @ApiProperty({ description: 'Marital status', example: true, required: false })
+    @Expose()
+    @IsBoolean()
+    @IsOptional()
+    marriedStatus?: boolean;
+
+    @ApiProperty({ description: 'Number of children', example: 2, required: false })
+    @Expose()
+    @Type(() => Number)
+    @IsNumber()
+    @IsOptional()
+    numberOfChildren?: number;
+
+    @ApiProperty({ description: 'Children information', example: 'Two kids, ages 5 and 8', required: false })
+    @Expose()
+    @IsString()
+    @IsOptional()
+    childrenDescription?: string;
 
 }
