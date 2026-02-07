@@ -1,7 +1,7 @@
 import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
 
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
 import { SignupRequestDto } from '../dto/signup.dto';
@@ -9,6 +9,7 @@ import { Employee } from '../entity/employee.entity';
 import { Degree } from '../entity/degree.entity';
 import { DepartmentService } from './department.service';
 import { AdminUpdateEmployeeDto, UpdateProfileDto, DegreeInputDto } from '../dto/employee.dto';
+import { S3Service } from '../../management/service/s3.service';
 
 @Injectable()
 export class EmployeeService {
@@ -18,6 +19,7 @@ export class EmployeeService {
     @InjectRepository(Degree)
     private readonly degreeRepository: Repository<Degree>,
     private readonly departmentService: DepartmentService,
+    private readonly s3Service: S3Service,
   ) {}
   async findOneById(id: string): Promise<Employee> {
     const result = await this.employeeRepository.findOne({ where: { id }, relations: ['department', 'degrees'] });
@@ -148,5 +150,55 @@ export class EmployeeService {
     // Create new degrees
     const newDegrees = degrees.map(deg => this.degreeRepository.create({ ...deg, employee }));
     await this.degreeRepository.save(newDegrees);
+  }
+
+  async createAvatarUploadUrl(employeeId: string, fileName: string, fileType: string) {
+    const employee = await this.findById(employeeId);
+
+    if (!fileName || !fileType) {
+      throw new BadRequestException('fileName and fileType are required');
+    }
+
+    const safeFileName = fileName.replace(/\s+/g, '-');
+    const key = `employees/${employee.id}/avatar/${Date.now()}-${safeFileName}`;
+
+    const { uploadUrl, fileUrl } = await this.s3Service.createUploadUrl({
+      key,
+      contentType: fileType,
+    });
+
+    employee.avatarKey = key;
+    employee.avatarUrl = fileUrl;
+    await this.employeeRepository.save(employee);
+    // KHÔNG lưu vào DB ở đây - chờ frontend upload xong mới confirm
+    return {
+      uploadUrl,
+      fileUrl,
+      key,
+      employeeId: employee.id,
+    };
+  }
+
+  async confirmAvatarUpload(employeeId: string, key: string, fileUrl: string) {
+    const employee = await this.findById(employeeId);
+
+    if (!key || !fileUrl) {
+      throw new BadRequestException('key and fileUrl are required');
+    }
+
+    // Verify key thuộc về employee này
+    if (!key.startsWith(`employees/${employee.id}/avatar/`)) {
+      throw new BadRequestException('Invalid avatar key for this employee');
+    }
+
+    // Lưu avatar key và URL vào database
+    employee.avatarKey = key;
+    employee.avatarUrl = fileUrl;
+    await this.employeeRepository.save(employee);
+
+    return {
+      avatarUrl: fileUrl,
+      avatarKey: key,
+    };
   }
 }

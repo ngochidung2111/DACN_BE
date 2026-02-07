@@ -102,4 +102,10 @@ export class UpdateProfileDto {
     @IsOptional()
     childrenDescription?: string;
 
+    @ApiProperty({ description: 'Avatar URL', example: 'https://example.com/avatar.jpg', required: false })
+    @Expose()
+    @IsString()
+    @IsOptional()
+    avatarUrl?: string;
+
 }

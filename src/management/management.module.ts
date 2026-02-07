@@ -6,14 +6,14 @@ import { RoomController } from './controller/room.controller';
 import { ManagementService } from './service/management.service';
 import { BookingService } from './service/booking.service';
 import { RoomService } from './service/room.service';
-import { S3Service } from './service/s3.service';
 import { Booking } from './entity/booking.entity';
 import { Room } from './entity/room.entity';
 import { AuthModule } from '../auth/auth.module';
+import { SharedModule } from '../shared/shared.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Booking, Room]), AuthModule],
+  imports: [TypeOrmModule.forFeature([Booking, Room]), AuthModule, SharedModule],
   controllers: [ManagementController, BookingController, RoomController],
-  providers: [ManagementService, BookingService, RoomService, S3Service],
+  providers: [ManagementService, BookingService, RoomService],
 })
 export class ManagementModule {}

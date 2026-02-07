@@ -4,6 +4,7 @@ import { ApiProperty } from "@nestjs/swagger";
 import { Expose, Type } from "class-transformer";
 import { IsBoolean, IsEmail, IsEnum, IsNumber, IsOptional, IsString } from "class-validator";
 import { GENDER } from "../entity/constant";
+import { DepartmentDto } from "./department.dto";
 
 export class DegreeDto {
     @ApiProperty({ description: 'Degree ID', example: 'uuid-123' })
@@ -191,12 +192,18 @@ export class EmployeeDto {
         required: false,
     })
     @Expose()
-    department?: Department;
+    @Type(() => DepartmentDto)
+    department?: DepartmentDto;
 
     @ApiProperty({ description: 'Employee degrees', required: false, type: () => [DegreeDto] })
     @Expose()
     @Type(() => DegreeDto)
     degrees?: DegreeDto[];
+
+    @ApiProperty({ description: 'Avatar URL', example: 'https://example.com/avatar.jpg', required: false })
+    @Expose()
+
+    avatarUrl?: string;
 }
 
 export class UpdateProfileDto {
