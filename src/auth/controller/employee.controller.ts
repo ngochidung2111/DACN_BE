@@ -1,8 +1,9 @@
 import { ROLE } from 'src/management/entity/constants';
 
-import { Body, Controller, Get, NotFoundException, Param, Post, Request, Res, UseGuards, Query, Patch } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, Post, Request, Res, UseGuards, Query, Patch, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiBody, ApiResponse, ApiTags, ApiQuery } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiResponse, ApiTags, ApiQuery, ApiOperation, ApiParam, ApiConsumes } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 import { Roles } from '../roles.decorator';
 import { RolesGuard } from '../roles.guard';
@@ -100,6 +101,78 @@ export class EmployeeController {
     const updatedEmployee = await this.employeeService.update(req.user.email, updateProfileDto);
     return plainToInstance(EmployeeDto, updatedEmployee, { excludeExtraneousValues: true });
   }
+
+  // Upload avatar
+  // @ApiOperation({ summary: 'Upload avatar cho employee' })
+  // @ApiConsumes('multipart/form-data')
+  // @ApiBody({
+  //   schema: {
+  //     type: 'object',
+  //     properties: {
+  //       file: {
+  //         type: 'string',
+  //         format: 'binary',
+  //       },
+  //     },
+  //   },
+  // })
+  // @ApiResponse({ status: 200, description: 'Avatar uploaded successfully' })
+  // @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  // @UseGuards(AuthGuard('jwt'), RolesGuard)
+  // @UseInterceptors(FileInterceptor('file'))
+  // @Post('avatar/upload')
+  // async uploadAvatar(
+  //   @Request() req,
+  //   @UploadedFile() file: any,
+  // ) {
+  //   const employee = await this.employeeService.findOneByEmail(req.user.email);
+  //   if (!employee) throw new NotFoundException('Employee not found');
+
+  //   const data = await this.employeeService.uploadAvatar(employee.id, file);
+
+  //   return ResponseBuilder.createResponse({
+  //     statusCode: 200,
+  //     message: 'Avatar uploaded successfully',
+  //     data,
+  //   });
+  // }
+
+  // Admin upload avatar for employee
+  // @ApiOperation({ summary: 'Admin upload avatar cho employee' })
+  // @ApiParam({ name: 'id', description: 'Employee ID' })
+  // @ApiConsumes('multipart/form-data')
+  // @ApiBody({
+  //   schema: {
+  //     type: 'object',
+  //     properties: {
+  //       file: {
+  //         type: 'string',
+  //         format: 'binary',
+  //       },
+  //     },
+  //   },
+  // })
+  // @ApiResponse({ status: 200, description: 'Avatar uploaded successfully' })
+  // @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  // @ApiResponse({ status: 403, description: 'Forbidden.' })
+  // @ApiResponse({ status: 404, description: 'Employee not found.' })
+  // @UseGuards(AuthGuard('jwt'), RolesGuard)
+  // @Roles(ROLE.ADMIN)
+  // @UseInterceptors(FileInterceptor('file'))
+  // @Post(':id/avatar/upload')
+  // async uploadAvatarByAdmin(
+  //   @Param('id') employeeId: string,
+  //   @UploadedFile() file: any,
+  // ) {
+  //   const data = await this.employeeService.uploadAvatar(employeeId, file);
+
+  //   return ResponseBuilder.createResponse({
+  //     statusCode: 200,
+  //     message: 'Avatar uploaded successfully',
+  //     data,
+  //   });
+  // }
+
   // @UseGuards(AuthGuard('jwt'), RolesGuard)
   // @Roles(ROLE.ADMIN, ROLE.MANAGER)
   // @Get('department/:name')

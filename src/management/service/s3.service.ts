@@ -84,4 +84,30 @@ export class S3Service {
   getPublicUrl(key: string) {
     return `${this.publicBaseUrl}/${key}`;
   }
+
+  async uploadFile(params: {
+    key: string;
+    file: Buffer;
+    contentType: string;
+  }): Promise<{ key: string; fileUrl: string }> {
+    const command = new PutObjectCommand({
+      Bucket: this.bucket,
+      Key: params.key,
+      Body: params.file,
+      ContentType: params.contentType,
+    });
+
+    try {
+      await this.client.send(command);
+      
+      return {
+        key: params.key,
+        fileUrl: this.getPublicUrl(params.key),
+      };
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(`Failed to upload file for key ${params.key}`, err?.stack);
+      throw new InternalServerErrorException('Could not upload file to S3');
+    }
+  }
 }

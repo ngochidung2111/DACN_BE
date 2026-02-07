@@ -63,6 +63,12 @@ export class Employee {
   @Column({nullable: true})
   childrenDescription: string;
 
+  @Column({nullable: true})
+  avatarUrl: string;
+
+  @Column({nullable: true})
+  avatarKey: string;
+
   @ManyToOne(() => Department, (department) => department.employees, { nullable: true })
   department: Department;
 

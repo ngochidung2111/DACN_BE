@@ -8,6 +8,7 @@ import { Roles } from "../roles.decorator";
 import { ResponseBuilder } from "src/lib/dto/response-builder.dto";
 import { RolesGuard } from "../roles.guard";
 import { ROLE } from "src/management/entity/constants";
+import { plainToInstance } from "class-transformer";
 
 @ApiTags('department')
 @ApiBearerAuth()
@@ -28,7 +29,7 @@ export class DepartmentController {
         return ResponseBuilder.createResponse({
             statusCode: 200,
             message: 'Departments retrieved successfully',
-            data: await this.departmentService.findAll(),
+            data: plainToInstance(DepartmentDto, await this.departmentService.findAll(), { excludeExtraneousValues: true }),
         })
     }
 
