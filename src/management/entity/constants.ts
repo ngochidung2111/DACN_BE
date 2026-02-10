@@ -48,3 +48,9 @@ export enum TICKET_CATEGORY {
   SALES = 'SALES',
   MARKETING = 'MARKETING',
 }
+
+export enum ATTENDANCE_STATUS {
+  PRESENT = 'PRESENT',
+  ABSENT = 'ABSENT',
+  ON_LEAVE = 'ON_LEAVE',
+}

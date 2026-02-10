@@ -102,6 +102,7 @@ export class EmployeeController {
     return plainToInstance(EmployeeDto, updatedEmployee, { excludeExtraneousValues: true });
   }
 
+
   // Upload avatar
   // @ApiOperation({ summary: 'Upload avatar cho employee' })
   // @ApiConsumes('multipart/form-data')
@@ -194,14 +195,36 @@ export class EmployeeController {
     if (!employee || !employee.department) {
       throw new NotFoundException('Department not found for the manager');
     }
-    if (employee.roles !== ROLE.MANAGER) {
-      throw new NotFoundException('User is not a manager');
-    }
+    
     const departmentEmployees = await this.employeeService.findByDepartment(employee.department.name);
     return ResponseBuilder.createResponse({
       statusCode: 200,
       message: 'Employees retrieved successfully',
       data: plainToInstance(EmployeeDto, departmentEmployees, { excludeExtraneousValues: true }),
+    });
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Get(':id')
+  @Roles(ROLE.ADMIN, ROLE.MANAGER)
+  @ApiResponse({ status: 200, description: 'The employee profile.', type: EmployeeDto })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  async getEmployeeById(@Param('id') id: string, @Request() req) {
+    const user = await this.employeeService.findOneByEmail(req.user.email);
+    if (user.roles === ROLE.MANAGER) {
+      if (!user.department) {
+        throw new NotFoundException('Department not found for the manager');
+      }
+      const targetEmployee = await this.employeeService.findById(id);   
+      if (targetEmployee.department?.id !== user.department.id) {
+        throw new NotFoundException('Employee not found in your department');
+      }
+    }
+    const employee = await this.employeeService.findById(id);
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'Employee retrieved successfully',
+      data: plainToInstance(EmployeeDto, employee, { excludeExtraneousValues: true }),
     });
   }
 }

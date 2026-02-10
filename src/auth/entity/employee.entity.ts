@@ -3,6 +3,7 @@ import { Column, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'ty
 import { Department } from './department.entity';
 import { GENDER } from './constant';
 import { Degree } from './degree.entity';
+import { Attendance } from 'src/management/entity/attendance.entity';
 
 @Entity()
 export class Employee {
@@ -74,4 +75,7 @@ export class Employee {
 
   @OneToMany(() => Degree, (degree) => degree.employee, { nullable: true })
   degrees: Degree[];
+
+  @OneToMany(() => Attendance, (attendance) => attendance.employee, { nullable: true })
+  attendances: Attendance[];
 }
