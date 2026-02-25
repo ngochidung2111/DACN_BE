@@ -1,5 +1,5 @@
 import { ROLE } from 'src/management/entity/constants';
-import { Column, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, DeleteDateColumn, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { Department } from './department.entity';
 import { GENDER } from './constant';
 import { Degree } from './degree.entity';
@@ -69,6 +69,9 @@ export class Employee {
 
   @Column({nullable: true})
   avatarKey: string;
+
+  @DeleteDateColumn({ nullable: true })
+  deletedAt?: Date;
 
   @ManyToOne(() => Department, (department) => department.employees, { nullable: true })
   department: Department;

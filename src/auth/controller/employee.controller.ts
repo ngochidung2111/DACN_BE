@@ -1,6 +1,6 @@
 import { ROLE } from 'src/management/entity/constants';
 
-import { Body, Controller, Get, NotFoundException, Param, Post, Request, Res, UseGuards, Query, Patch, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, NotFoundException, Param, Post, Request, Res, UseGuards, Query, Patch, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiBody, ApiResponse, ApiTags, ApiQuery, ApiOperation, ApiParam, ApiConsumes } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -12,7 +12,7 @@ import { QueryEmployeeDto } from '../dto/query-employee.dto';
 import { EmployeeListResponseDto } from '../dto/employee-list-response.dto';
 
 import { plainToInstance } from 'class-transformer';
-import { AdminUpdateEmployeeDto, EmployeeDto, UpdateProfileDto } from '../dto/employee.dto';
+import { AdminCreateEmployeeDto, AdminUpdateEmployeeDto, EmployeeDto, UpdateProfileDto } from '../dto/employee.dto';
 import { ResponseBuilder } from 'src/lib/dto/response-builder.dto';
 
 @ApiTags('employee')
@@ -72,6 +72,22 @@ export class EmployeeController {
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(ROLE.ADMIN)
+  @Post('by-admin')
+  @ApiBody({ type: AdminCreateEmployeeDto })
+  @ApiResponse({ status: 201, description: 'Employee created successfully.', type: EmployeeDto })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  async createEmployeeByAdmin(@Body() body: AdminCreateEmployeeDto) {
+    const created = await this.employeeService.createByAdmin(body);
+    return ResponseBuilder.createResponse({
+      statusCode: 201,
+      message: 'Employee created successfully',
+      data: plainToInstance(EmployeeDto, created, { excludeExtraneousValues: true }),
+    });
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(ROLE.ADMIN, ROLE.MANAGER)
   @Patch('by-admin/:id')
   @ApiBody({ type: AdminUpdateEmployeeDto })
   @ApiResponse({ status: 200, description: 'Employee updated successfully.', type: EmployeeDto })
@@ -225,6 +241,24 @@ export class EmployeeController {
       statusCode: 200,
       message: 'Employee retrieved successfully',
       data: plainToInstance(EmployeeDto, employee, { excludeExtraneousValues: true }),
+    });
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(ROLE.ADMIN)
+  @Delete(':id')
+  @ApiOperation({ summary: 'Soft delete employee by ID' })
+  @ApiParam({ name: 'id', description: 'Employee ID' })
+  @ApiResponse({ status: 200, description: 'Employee deleted successfully.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @ApiResponse({ status: 404, description: 'Employee not found.' })
+  async deleteEmployeeById(@Param('id') id: string) {
+    await this.employeeService.softDeleteById(id);
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'Employee deleted successfully',
+      data: null,
     });
   }
 }

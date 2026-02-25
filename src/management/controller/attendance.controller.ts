@@ -4,6 +4,8 @@ import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from 'src/auth/roles.guard';
 import { AttendanceService } from '../service/attendance.service';
 import { ResponseBuilder } from 'src/lib/dto/response-builder.dto';
+import { AttendanceDto } from '../dto/attendance.dto';
+import { plainToInstance } from 'class-transformer';
 
 @ApiTags('Attendance')
 @Controller('attendance')
@@ -22,7 +24,7 @@ export class AttendanceController {
     return {
       success: true,
       message: 'Checked in successfully',
-      data: attendance,
+      data: plainToInstance(AttendanceDto, attendance, { excludeExtraneousValues: true }),
     };
   }
 
@@ -52,6 +54,21 @@ export class AttendanceController {
         statusCode: 200,
         message: 'Attendance records retrieved successfully',
         data: await this.attendanceService.getAttendanceByEmployee(req.user.userId),
+      }
+    );
+  }
+
+  @ApiOperation({ summary: 'List attendance days and check if total working time is at least 8 hours' })
+  @ApiResponse({ status: 200, description: 'Daily working hours retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Post('my-attendance/daily-hours')
+  async getDailyWorkingHours(@Request() req) {
+    return ResponseBuilder.createResponse(
+      {
+        statusCode: 200,
+        message: 'Daily working hours retrieved successfully',
+        data: await this.attendanceService.getDailyWorkingHours(req.user.userId),
       }
     );
   }

@@ -4,9 +4,7 @@ import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
 @Entity()
 export class Attendance {
     @PrimaryGeneratedColumn('uuid')
-    id: string;
-    
-    
+    id: string;  
 
     @Column()
     TimeIn: Date;

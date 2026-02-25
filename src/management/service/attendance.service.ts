@@ -28,6 +28,13 @@ export class AttendanceService {
         return new Date(Date.now() + 7 * 60 * 60 * 1000);
     }
 
+    private formatUtcDate(date: Date) {
+        const year = date.getUTCFullYear();
+        const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(date.getUTCDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
     async checkIn(employeeId: string) {
         const employee = await this.employeeService.findById(employeeId);
 
@@ -96,5 +103,39 @@ export class AttendanceService {
             };
         });
         return attendanceDTOs;
+    }
+
+    async getDailyWorkingHours(employeeId: string) {
+        const employee = await this.employeeService.findById(employeeId);
+        const attendances = await this.attendanceRepository.find({
+            where: { employee: { id: employee.id } },
+            order: { TimeIn: 'DESC' },
+        });
+
+        const eightHoursMs = 8 * 60 * 60 * 1000;
+        const dailyMap = new Map<string, number>();
+
+        for (const attendance of attendances) {
+            if (!attendance.TimeOut) {
+                continue;
+            }
+
+            const day = this.formatUtcDate(attendance.TimeIn);
+            const workedMs = Math.max(0, attendance.TimeOut.getTime() - attendance.TimeIn.getTime());
+
+            dailyMap.set(day, (dailyMap.get(day) ?? 0) + workedMs);
+        }
+
+        return [...dailyMap.entries()]
+            .sort(([dayA], [dayB]) => dayB.localeCompare(dayA))
+            .map(([day, totalWorkedMs]) => {
+                const totalWorkedHours = Number((totalWorkedMs / (60 * 60 * 1000)).toFixed(2));
+
+                return {
+                    date: day,
+                    totalWorkedHours,
+                    enoughEightHours: totalWorkedMs >= eightHoursMs,
+                };
+            });
     }
 }

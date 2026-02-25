@@ -8,7 +8,7 @@ import { SignupRequestDto } from '../dto/signup.dto';
 import { Employee } from '../entity/employee.entity';
 import { Degree } from '../entity/degree.entity';
 import { DepartmentService } from './department.service';
-import { AdminUpdateEmployeeDto, UpdateProfileDto, DegreeInputDto } from '../dto/employee.dto';
+import { AdminCreateEmployeeDto, AdminUpdateEmployeeDto, UpdateProfileDto, DegreeInputDto } from '../dto/employee.dto';
 import { S3Service } from '../../management/service/s3.service';
 
 @Injectable()
@@ -116,6 +116,32 @@ export class EmployeeService {
     }
     return await this.findById(id);
   }
+
+  async createByAdmin(dto: AdminCreateEmployeeDto): Promise<Employee> {
+    if (await this.checkEmail(dto.email)) {
+      throw new UnauthorizedException('Email already in use');
+    }
+
+    let department;
+    if (dto.departmentName) {
+      department = await this.departmentService.findByName(dto.departmentName);
+    }
+
+    const { password, departmentName, degrees, ...rest } = dto;
+
+    const employee = this.employeeRepository.create({
+      ...rest,
+      password_hash: await bcrypt.hash(password, 10),
+      department,
+    });
+
+    const saved = await this.employeeRepository.save(employee);
+    if (degrees && degrees.length > 0) {
+      await this.updateDegrees(saved, degrees);
+    }
+
+    return await this.findById(saved.id);
+  }
   async updateDepartment(email: string, departmentName: string): Promise<Employee> {
     const employee = await this.findOneByEmail(email);
     const department = await this.departmentService.findByName(departmentName);
@@ -139,6 +165,11 @@ export class EmployeeService {
       throw new NotFoundException('Employee not found');
     }
     return employee;
+  }
+
+  async softDeleteById(id: string): Promise<void> {
+    const employee = await this.findById(id);
+    await this.employeeRepository.softRemove(employee);
   }
 
   private async updateDegrees(employee: Employee, degrees: DegreeInputDto[]): Promise<void> {

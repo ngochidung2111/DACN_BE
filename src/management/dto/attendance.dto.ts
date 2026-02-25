@@ -5,14 +5,8 @@ export class AttendanceDto {
     id: string;
 
     @Expose()
-    timeIn: Date;
+    TimeIn: Date;
 
     @Expose()
-    timeOut: Date;
-
-    @Expose()
-    timeInStatus: string;
-
-    @Expose()
-    timeOutStatus: string;
-    }
+    TimeOut: Date;
+}

@@ -2,7 +2,7 @@ import { ROLE } from "src/management/entity/constants";
 import { Department } from "../entity/department.entity";
 import { ApiProperty } from "@nestjs/swagger";
 import { Expose, Type } from "class-transformer";
-import { IsBoolean, IsEmail, IsEnum, IsNumber, IsOptional, IsString } from "class-validator";
+import { IsBoolean, IsEmail, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, MinLength } from "class-validator";
 import { GENDER } from "../entity/constant";
 import { DepartmentDto } from "./department.dto";
 
@@ -365,6 +365,131 @@ export class AdminUpdateEmployeeDto {
     @IsEnum(ROLE)
     @IsOptional()
     roles?: ROLE;
+
+    @ApiProperty({ description: 'User phone number', example: '+1234567890', required: false })
+    @Expose()
+    @IsString()
+    @IsOptional()
+    phone?: string;
+
+    @ApiProperty({ description: 'Basic salary of the employee', example: 50000, required: false })
+    @Expose()
+    @Type(() => Number)
+    @IsNumber()
+    @IsOptional()
+    basicSalary?: number;
+
+    @ApiProperty({ description: 'Gross salary of the employee', example: 60000, required: false })
+    @Expose()
+    @Type(() => Number)
+    @IsNumber()
+    @IsOptional()
+    grossSalary?: number;
+
+    @ApiProperty({ description: 'Contract sign date', example: '2024-01-01', required: false })
+    @Expose()
+    @Type(() => Date)
+    @IsOptional()
+    signDate?: Date;
+
+    @ApiProperty({ description: 'Quit date', example: '2025-12-31', required: false })
+    @Expose()
+    @Type(() => Date)
+    @IsOptional()
+    quitDate?: Date;
+
+    @ApiProperty({ description: 'ID card number', example: '123456789', required: false })
+    @Expose()
+    @IsString()
+    @IsOptional()
+    idCard?: string;
+
+    @ApiProperty({ description: 'Employee address', example: '123 Main St, City, Country', required: false })
+    @Expose()
+    @IsString()
+    @IsOptional()
+    address?: string;
+
+    @ApiProperty({ description: 'Department name', example: 'Sales', required: false })
+    @Expose()
+    @IsString()
+    @IsOptional()
+    departmentName?: string;
+
+    @ApiProperty({ description: 'Marital status', example: true, required: false })
+    @Expose()
+    @IsBoolean()
+    @IsOptional()
+    marriedStatus?: boolean;
+
+    @ApiProperty({ description: 'Number of children', example: 2, required: false })
+    @Expose()
+    @Type(() => Number)
+    @IsNumber()
+    @IsOptional()
+    numberOfChildren?: number;
+
+    @ApiProperty({ description: 'Children information', example: 'Two kids, ages 5 and 8', required: false })
+    @Expose()
+    @IsString()
+    @IsOptional()
+    childrenDescription?: string;
+
+    @ApiProperty({ description: 'Employee degrees', required: false, type: () => [DegreeInputDto] })
+    @Expose()
+    @Type(() => DegreeInputDto)
+    @IsOptional()
+    degrees?: DegreeInputDto[];
+}
+
+export class AdminCreateEmployeeDto {
+    @ApiProperty({ description: 'User last name', example: 'Doe' })
+    @Expose()
+    @IsString()
+    @IsNotEmpty()
+    @MinLength(2)
+    lastName: string;
+
+    @ApiProperty({ description: 'User first name', example: 'John' })
+    @Expose()
+    @IsString()
+    @IsNotEmpty()
+    @MinLength(2)
+    firstName: string;
+
+    @ApiProperty({ description: 'User middle name', example: 'Michael' })
+    @Expose()
+    @IsString()
+    @IsNotEmpty()
+    @MinLength(2)
+    middleName: string;
+
+    @ApiProperty({ description: 'User gender', example: 'Male', enum: GENDER })
+    @Expose()
+    @IsEnum(GENDER)
+    gender: GENDER;
+
+    @ApiProperty({ description: 'User date of birth', example: '1990-01-01' })
+    @Expose()
+    @Type(() => Date)
+    dateOfBirth: Date;
+
+    @ApiProperty({ description: 'User email address', example: 'john.doe@example.com' })
+    @Expose()
+    @IsEmail()
+    email: string;
+
+    @ApiProperty({ description: 'Password for employee account', example: 'password123', minLength: 6 })
+    @Expose()
+    @IsString()
+    @IsNotEmpty()
+    @MinLength(6)
+    password: string;
+
+    @ApiProperty({ description: 'Roles assigned to the user', example: ROLE.EMPLOYEE, enum: ROLE })
+    @Expose()
+    @IsEnum(ROLE)
+    roles: ROLE;
 
     @ApiProperty({ description: 'User phone number', example: '+1234567890', required: false })
     @Expose()
