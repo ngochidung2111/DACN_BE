@@ -59,7 +59,7 @@ jobs:
           -e DATABASE_NAME=${{ secrets.DATABASE_NAME }} \
           -e JWT_SECRET=${{ secrets.JWT_SECRET }} \
           -e S3_ACCESS_KEY_ID=${{ secrets.S3_ACCESS_KEY_ID}} \
-          -e S3_SECRET_ACCESS_KEY=${{secrets.S3_SECRET_ACCESS_KEY}} \
-          -e S3_BUCKET=${{secrets.S3_BUCKET}} \
-          -e S3_REGION=${{secrets.S3_REGION}} \
+          -e S3_SECRET_ACCESS_KEY=${{ secrets.S3_SECRET_ACCESS_KEY }} \
+          -e S3_BUCKET=${{ secrets.S3_BUCKET }} \
+          -e S3_REGION=${{ secrets.S3_REGION }} \
           ${{ secrets.DOCKERHUB_USERNAME }}/dacn:latest
