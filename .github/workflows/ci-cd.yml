@@ -49,17 +49,21 @@ jobs:
     # Step 3: Run the new Docker container
     - name: Run Docker container
       run: |
-        sudo docker run -d \
-          --name dacn-container \
-          -p 3000:3000 \
-          -e DATABASE_HOST=${{ secrets.DATABASE_HOST }} \
-          -e DATABASE_PORT=${{ secrets.DATABASE_PORT }} \
-          -e DATABASE_USER=${{ secrets.DATABASE_USER }} \
-          -e DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }} \
-          -e DATABASE_NAME=${{ secrets.DATABASE_NAME }} \
-          -e JWT_SECRET=${{ secrets.JWT_SECRET }} \
-          -e S3_ACCESS_KEY_ID=${{ secrets.S3_ACCESS_KEY_ID}} \
-          -e S3_SECRET_ACCESS_KEY=${{ secrets.S3_SECRET_ACCESS_KEY }} \
-          -e S3_BUCKET=${{ secrets.S3_BUCKET }} \
-          -e S3_REGION=${{ secrets.S3_REGION }} \
-          chidung123456/dacn:latest
+          docker run -d \
+            --name dacn-container \
+            -p 3000:3000 \
+            --env-file <(cat <<EOF
+            DATABASE_HOST=${{ secrets.DATABASE_HOST }}
+            DATABASE_PORT=${{ secrets.DATABASE_PORT }}
+            DATABASE_USER=${{ secrets.DATABASE_USER }}
+            DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }}
+            DATABASE_NAME=${{ secrets.DATABASE_NAME }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            S3_ACCESS_KEY_ID=${{ secrets.S3_ACCESS_KEY_ID }}
+            S3_SECRET_ACCESS_KEY=${{ secrets.S3_SECRET_ACCESS_KEY }}
+            S3_BUCKET=${{ secrets.S3_BUCKET }}
+            S3_REGION=${{ secrets.S3_REGION }}
+            EOF
+            ) \
+            chidung123456/dacn:latest
+
