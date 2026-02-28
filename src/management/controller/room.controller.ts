@@ -1,11 +1,13 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { RoomService } from '../service/room.service';
-import { CreateRoomDto, UpdateRoomDto, RoomResponseDto, RoomImageUploadDto } from '../dto';
+import { CreateRoomDto, UpdateRoomDto, RoomResponseDto } from '../dto';
 import { RolesGuard } from 'src/auth/roles.guard';
 import { Roles } from 'src/auth/roles.decorator';
 import { AuthGuard } from '@nestjs/passport';
 import { ROLE } from '../entity/constants';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiConsumes } from '@nestjs/swagger';
 
 @ApiTags('Rooms')
 @Controller('rooms')
@@ -89,27 +91,36 @@ export class RoomController {
     };
   }
 
-  // Tạo URL upload ảnh phòng lên S3
-  @ApiOperation({ summary: 'Tạo URL upload ảnh phòng lên S3' })
+  @ApiOperation({ summary: 'Upload ảnh phòng qua backend (multipart/form-data)' })
   @ApiParam({ name: 'id', description: 'Room ID' })
-  @ApiBody({ type: RoomImageUploadDto })
-  @ApiResponse({ status: 200, description: 'Presigned upload URL created' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+      required: ['file'],
+    },
+  })
+  @ApiResponse({ status: 201, description: 'Room image uploaded successfully' })
   @ApiResponse({ status: 404, description: 'Room not found' })
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(ROLE.ADMIN)
-  @Post(':id/image/upload-url')
-  async createRoomImageUploadUrl(
+  @UseInterceptors(FileInterceptor('file'))
+  @Post(':id/image/upload')
+  async uploadRoomImage(
     @Param('id') roomId: string,
-    @Body() payload: RoomImageUploadDto,
+    @UploadedFile() file: Express.Multer.File,
   ) {
-    const data = await this.roomService.createRoomImageUploadUrl(
-      roomId,
-      payload.fileName,
-      payload.fileType,
-    );
+    const data = await this.roomService.uploadRoomImage(roomId, file);
 
     return {
       success: true,
+      message: 'Room image uploaded successfully',
       data,
     };
   }

@@ -4,6 +4,7 @@ import { Department } from './department.entity';
 import { GENDER } from './constant';
 import { Degree } from './degree.entity';
 import { Attendance } from 'src/management/entity/attendance.entity';
+import { Payroll } from 'src/management/entity/payroll.entity';
 
 @Entity()
 export class Employee {
@@ -81,4 +82,7 @@ export class Employee {
 
   @OneToMany(() => Attendance, (attendance) => attendance.employee, { nullable: true })
   attendances: Attendance[];
+
+  @OneToMany(() => Payroll, (payroll) => payroll.employee, { nullable: true })
+  payrolls: Payroll[];
 }
