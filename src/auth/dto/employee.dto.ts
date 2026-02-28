@@ -2,7 +2,7 @@ import { ROLE } from "src/management/entity/constants";
 import { Department } from "../entity/department.entity";
 import { ApiProperty } from "@nestjs/swagger";
 import { Expose, Type } from "class-transformer";
-import { IsBoolean, IsEmail, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, MinLength } from "class-validator";
+import { IsBoolean, IsDate, IsEmail, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, MinLength } from "class-validator";
 import { GENDER } from "../entity/constant";
 import { DepartmentDto } from "./department.dto";
 
@@ -472,6 +472,8 @@ export class AdminCreateEmployeeDto {
     @ApiProperty({ description: 'User date of birth', example: '1990-01-01' })
     @Expose()
     @Type(() => Date)
+    @IsDate()
+    @IsNotEmpty()
     dateOfBirth: Date;
 
     @ApiProperty({ description: 'User email address', example: 'john.doe@example.com' })

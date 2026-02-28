@@ -1,10 +1,11 @@
-import { Body, Controller, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Post, Request, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiConsumes, ApiOperation } from '@nestjs/swagger';
 
 import { LoginRequestDto, LoginResponseDto, RefreshTokenRequestDto } from '../dto/login.dto';
 import { SignupRequestDto, SignupResponseDto } from '../dto/signup.dto';
-import { AvatarUploadDto, AvatarUploadResponseDto, ConfirmAvatarUploadDto } from '../dto/avatar-upload.dto';
 import { AuthService } from '../service/auth.service';
 import { EmployeeService } from '../service/employee.service';
 import { ResponseBuilder } from 'src/lib/dto/response-builder.dto';
@@ -62,58 +63,41 @@ export class AuthController {
     return this.authService.refreshToken(body.refreshToken);
   }
 
-  @Post('avatar/upload-url')
-  @ApiBody({ type: AvatarUploadDto })
+  @Post('avatar/upload')
+  @ApiOperation({ summary: 'Upload avatar via backend (multipart/form-data)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+      required: ['file'],
+    },
+  })
   @ApiResponse({
     status: 201,
-    description: 'Presigned URL for avatar upload generated successfully.',
-    type: AvatarUploadResponseDto,
+    description: 'Avatar uploaded successfully.',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @UseGuards(AuthGuard('jwt'))
-  async createAvatarUploadUrl(
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadAvatar(
     @Request() req: any,
-    @Body() avatarUploadDto: AvatarUploadDto,
+    @UploadedFile() file: Express.Multer.File,
   ) {
     const employeeId = req.user.userId;
-    const data = await this.employeeService.createAvatarUploadUrl(
-      employeeId,
-      avatarUploadDto.fileName,
-      avatarUploadDto.fileType,
-    );
+    const data = await this.employeeService.uploadAvatar(employeeId, file);
 
     return ResponseBuilder.createResponse({
       statusCode: 201,
-      message: 'Avatar upload URL generated successfully',
-      data,
-    });
-  }
-
-  @Post('avatar/confirm')
-  @ApiBody({ type: ConfirmAvatarUploadDto })
-  @ApiResponse({
-    status: 200,
-    description: 'Avatar upload confirmed and saved to profile.',
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({ status: 400, description: 'Bad Request.' })
-  @UseGuards(AuthGuard('jwt'))
-  async confirmAvatarUpload(
-    @Request() req: any,
-    @Body() confirmDto: ConfirmAvatarUploadDto,
-  ) {
-    const employeeId = req.user.sub;
-    const data = await this.employeeService.confirmAvatarUpload(
-      employeeId,
-      confirmDto.key,
-      confirmDto.fileUrl,
-    );
-
-    return ResponseBuilder.createResponse({
-      statusCode: 200,
       message: 'Avatar uploaded successfully',
       data,
     });
   }
+
 }

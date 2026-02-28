@@ -8,15 +8,15 @@ import { AuthModule } from './auth/auth.module';
 import authConfig from './config/auth.config';
 import authLocalConfig from './config/auth.local.config';
 import defaultConfig from './config/default.config';
+import gcsConfig from './config/gcs.config';
 import localConfig from './config/local.config';
-import s3Config from './config/s3.config';
 import { ManagementModule } from './management/management.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [defaultConfig, localConfig, authConfig, authLocalConfig, s3Config],
+      load: [defaultConfig, localConfig, authConfig, authLocalConfig, gcsConfig],
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],

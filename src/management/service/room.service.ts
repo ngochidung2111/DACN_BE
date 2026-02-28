@@ -3,14 +3,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, MoreThanOrEqual } from 'typeorm';
 import { Room } from '../entity/room.entity';
 import { CreateRoomDto, UpdateRoomDto } from '../dto';
-import { S3Service } from './s3.service';
+import { GcsService } from './gcs.service';
 
 @Injectable()
 export class RoomService {
   constructor(
     @InjectRepository(Room)
     private roomRepository: Repository<Room>,
-    private readonly s3Service: S3Service,
+    private readonly gcsService: GcsService,
   ) {}
 
   // Tạo phòng mới
@@ -119,30 +119,30 @@ export class RoomService {
     });
   }
 
-  async createRoomImageUploadUrl(roomId: string, fileName: string, fileType: string) {
+  async uploadRoomImage(roomId: string, file: Express.Multer.File) {
     const room = await this.getRoomById(roomId);
 
-    if (!fileName || !fileType) {
-      throw new BadRequestException('fileName and fileType are required');
+    if (!file) {
+      throw new BadRequestException('file is required');
     }
 
-    const safeFileName = fileName.replace(/\s+/g, '-');
+    const safeFileName = file.originalname.replace(/\s+/g, '-');
     const key = `rooms/${room.id}/${Date.now()}-${safeFileName}`;
 
-    const { uploadUrl, fileUrl } = await this.s3Service.createUploadUrl({
+    const uploaded = await this.gcsService.uploadFile({
       key,
-      contentType: fileType,
+      file: file.buffer,
+      contentType: file.mimetype || 'application/octet-stream',
     });
 
-    room.imageKey = key;
-    room.imageUrl = fileUrl;
+    room.imageKey = uploaded.key;
+    room.imageUrl = uploaded.fileUrl;
     await this.roomRepository.save(room);
 
     return {
-      uploadUrl,
-      fileUrl,
-      key,
       roomId: room.id,
+      key: uploaded.key,
+      fileUrl: uploaded.fileUrl,
     };
   }
 
@@ -153,7 +153,7 @@ export class RoomService {
       throw new NotFoundException('Room does not have an image');
     }
 
-    const readUrl = await this.s3Service.createReadUrl(room.imageKey);
+    const readUrl = await this.gcsService.createReadUrl(room.imageKey);
 
     return {
       roomId: room.id,

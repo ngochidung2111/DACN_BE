@@ -9,3 +9,4 @@ export * from './notification.entity';
 export * from './company-announcement.entity';
 export * from './announcement-interaction.entity';
 export * from './leave-request.entity'
+export * from './payroll.entity';

@@ -16,7 +16,6 @@ import { DepartmentService } from './service/department.service';
 import { Department } from './entity/department.entity';
 import { DepartmentController } from './controller/department.controller';
 import { SharedModule } from '../shared/shared.module';
-import { S3Service } from '../management/service/s3.service';
 
 @Module({
   imports: [
@@ -32,7 +31,7 @@ import { S3Service } from '../management/service/s3.service';
     TypeOrmModule.forFeature([Employee, Department, Degree]),
     SharedModule,
   ],
-  providers: [AuthService, JwtStrategy, EmployeeService, LocalStrategy, DepartmentService, S3Service],
+  providers: [AuthService, JwtStrategy, EmployeeService, LocalStrategy, DepartmentService],
   controllers: [AuthController, EmployeeController, DepartmentController],
   exports: [EmployeeService, DepartmentService],
 })
