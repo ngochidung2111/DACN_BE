@@ -61,6 +61,12 @@ jobs:
         S3_SECRET_ACCESS_KEY=${{ secrets.S3_SECRET_ACCESS_KEY }}
         S3_BUCKET=${{ secrets.S3_BUCKET }}
         S3_REGION=${{ secrets.S3_REGION }}
+        GCS_PROJECT_ID=${{ secrets.GCS_PROJECT_ID }}
+        GCS_BUCKET=${{ secrets.GCS_BUCKET }}
+        GCS_PRESIGN_EXPIRES=${{ secrets.GCS_PRESIGN_EXPIRES }}
+        GCS_PUBLIC_BASE_URL=${{ secrets.GCS_PUBLIC_BASE_URL }}
+        GCS_CLIENT_EMAIL=${{ secrets.GCS_CLIENT_EMAIL }}
+        GCS_PRIVATE_KEY=${{ secrets.GCS_PRIVATE_KEY }}
         EOF
 
     - name: Run new container
