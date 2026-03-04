@@ -5,3 +5,8 @@ export * from './create-room.dto';
 export * from './update-room.dto';
 export * from './room-response.dto';
 export * from './payroll-month.dto';
+export * from './create-leave-request.dto';
+export * from './query-leave-request.dto';
+export * from './process-leave-request.dto';
+export * from './leave-request-list.dto';
+export * from './update-leave-request.dto';

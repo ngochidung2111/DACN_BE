@@ -1,14 +1,16 @@
 import { Employee } from "src/auth/entity/employee.entity";
-import { Column, JoinColumn, ManyToOne } from "typeorm";
+import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
+import { LEAVE_REQUEST_STATUS } from "./constants";
 
+@Entity()
 export class LeaveRequest {
-    @Column('uuid')
+    @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @Column()
+    @CreateDateColumn()
     created_at: Date;
 
-    @Column()
+    @UpdateDateColumn()
     updated_at: Date;
 
     
@@ -16,9 +18,9 @@ export class LeaveRequest {
     @ManyToOne(() => Employee)
     employee: Employee;
 
-    @Column('uuid')
-    @ManyToOne(() => Employee)
-    approved_by: string;
+    @JoinColumn({ name: 'approved_by' })
+    @ManyToOne(() => Employee, { nullable: true })
+    approved_by?: Employee;
 
     @Column()
     date_from: Date;
@@ -28,5 +30,11 @@ export class LeaveRequest {
 
     @Column()
     reason: string;
+
+    @Column()
+    description: string;
+
+    @Column({ default: LEAVE_REQUEST_STATUS.PENDING })
+    status: LEAVE_REQUEST_STATUS;
     
 }
