@@ -71,7 +71,7 @@ export class EmployeeController {
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(ROLE.ADMIN)
+  @Roles(ROLE.ADMIN, ROLE.MANAGER)
   @Post('by-admin')
   @ApiBody({ type: AdminCreateEmployeeDto })
   @ApiResponse({ status: 201, description: 'Employee created successfully.', type: EmployeeDto })
@@ -245,7 +245,7 @@ export class EmployeeController {
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(ROLE.ADMIN)
+  @Roles(ROLE.ADMIN, ROLE.MANAGER)
   @Delete(':id')
   @ApiOperation({ summary: 'Soft delete employee by ID' })
   @ApiParam({ name: 'id', description: 'Employee ID' })
