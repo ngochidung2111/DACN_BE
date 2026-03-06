@@ -1,8 +1,10 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Employee } from 'src/auth/entity/employee.entity';
+import { Check, Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 
 import { ASSET_CONDITION, ASSET_TYPE } from './constants';
 
 @Entity()
+@Check("(`type` = 'PRIVATE' AND `location` IS NULL) OR (`type` = 'PUBLIC' AND `owner_employee_id` IS NULL AND `location` IS NOT NULL)")
 export class Asset {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -13,15 +15,22 @@ export class Asset {
   @Column()
   type: ASSET_TYPE;
 
+  @ManyToOne(() => Employee, { nullable: true })
+  @JoinColumn({ name: 'owner_employee_id' })
+  owner?: Employee | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  location?: string | null;
+
   @Column()
   condition: ASSET_CONDITION;
 
-  @Column()
+  @Column({ type: 'datetime' })
   purchase_date: Date;
 
-  @Column()
+  @Column({ type: 'datetime' })
   warranty_expiration_date: Date;
 
-  @Column()
+  @Column({ type: 'datetime' })
   maintenance_schedule: Date;
 }

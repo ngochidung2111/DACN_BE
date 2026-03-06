@@ -16,9 +16,9 @@ export class AssetAssignment {
   @JoinColumn({ name: 'employee_id' })
   employee: Employee;
 
-  @Column()
+  @Column({ type: 'datetime' })
   assignment_date: Date;
 
-  @Column({ nullable: true })
-  return_date: Date;
+  @Column({ type: 'datetime', nullable: true })
+  return_date?: Date | null;
 }
