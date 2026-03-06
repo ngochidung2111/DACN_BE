@@ -1,11 +1,13 @@
-import { Controller, Post, UseGuards, Request } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Controller, Post, UseGuards, Request, Get, Query } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from 'src/auth/roles.guard';
 import { AttendanceService } from '../service/attendance.service';
 import { ResponseBuilder } from 'src/lib/dto/response-builder.dto';
 import { AttendanceDto } from '../dto/attendance.dto';
 import { plainToInstance } from 'class-transformer';
+import { QueryAttendanceDto } from '../dto/query-attendance.dto';
+import { MonthlyAttendanceSummaryQueryDto } from '../dto/monthly-attendance-summary-query.dto';
 
 @ApiTags('Attendance')
 @Controller('attendance')
@@ -44,16 +46,20 @@ export class AttendanceController {
   }
 
   @ApiOperation({ summary: 'Get attendance records for the logged-in employee' })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'pageSize', required: false, example: 20 })
+  @ApiQuery({ name: 'fromDate', required: false, example: '2026-03-01T00:00:00.000Z' })
+  @ApiQuery({ name: 'toDate', required: false, example: '2026-03-31T23:59:59.000Z' })
   @ApiResponse({ status: 200, description: 'Attendance records retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Post('my-attendance')
-  async getAttendanceByEmployee(@Request() req) {
+  @Get('my-attendance')
+  async getAttendanceByEmployee(@Request() req, @Query() query: QueryAttendanceDto) {
     return ResponseBuilder.createResponse(
       {
         statusCode: 200,
         message: 'Attendance records retrieved successfully',
-        data: await this.attendanceService.getAttendanceByEmployee(req.user.userId),
+        data: await this.attendanceService.getAttendanceByEmployee(req.user.userId, query),
       }
     );
   }
@@ -62,7 +68,7 @@ export class AttendanceController {
   @ApiResponse({ status: 200, description: 'Daily working hours retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Post('my-attendance/daily-hours')
+  @Get('my-attendance/daily-hours')
   async getDailyWorkingHours(@Request() req) {
     return ResponseBuilder.createResponse(
       {
@@ -71,5 +77,27 @@ export class AttendanceController {
         data: await this.attendanceService.getDailyWorkingHours(req.user.userId),
       }
     );
+  }
+
+  @ApiOperation({ summary: 'Get monthly attendance summary for logged-in employee' })
+  @ApiQuery({ name: 'year', required: true, example: 2026 })
+  @ApiQuery({ name: 'month', required: true, example: 3 })
+  @ApiResponse({ status: 200, description: 'Monthly attendance summary retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Get('my-attendance/monthly-summary')
+  async getMonthlyAttendanceSummary(
+    @Request() req,
+    @Query() query: MonthlyAttendanceSummaryQueryDto,
+  ) {
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'Monthly attendance summary retrieved successfully',
+      data: await this.attendanceService.getMonthlyAttendanceSummary(
+        req.user.userId,
+        query.year,
+        query.month,
+      ),
+    });
   }
 }
