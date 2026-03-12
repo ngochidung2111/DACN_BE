@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ManagementController } from './controller/management.controller';
 import { BookingController } from './controller/booking.controller';
@@ -14,6 +15,7 @@ import { AttendanceService } from './service/attendance.service';
 import { PayrollService } from './service/payroll.service';
 import { LeaveRequestService } from './service/leave-request.service';
 import { AssetService } from './service/asset.service';
+import { RoomStatusScheduler } from './service/room-status.scheduler';
 import { Booking } from './entity/booking.entity';
 import { Room } from './entity/room.entity';
 import { Attendance } from './entity/attendance.entity';
@@ -38,6 +40,7 @@ import { Employee } from '../auth/entity/employee.entity';
       Employee,
     ]),
     AuthModule,
+    ScheduleModule.forRoot(),
     SharedModule,
   ],
   controllers: [
@@ -57,6 +60,7 @@ import { Employee } from '../auth/entity/employee.entity';
     PayrollService,
     LeaveRequestService,
     AssetService,
+    RoomStatusScheduler,
   ],
 })
 export class ManagementModule {}
