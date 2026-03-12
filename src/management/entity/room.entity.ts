@@ -24,6 +24,6 @@ export class Room {
   @Column({ nullable: true })
   location?: string;
 
-  @Column()
+  @Column({default: ROOM_STATUS.AVAILABLE})
   status: ROOM_STATUS;
 }
