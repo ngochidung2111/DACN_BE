@@ -1,4 +1,5 @@
 import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { ROOM_STATUS } from './constants';
 
 @Entity()
 export class Room {
@@ -22,4 +23,7 @@ export class Room {
 
   @Column({ nullable: true })
   location?: string;
+
+  @Column()
+  status: ROOM_STATUS;
 }

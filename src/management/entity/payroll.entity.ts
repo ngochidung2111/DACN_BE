@@ -45,6 +45,9 @@ export class Payroll {
   overtimeHours: number;
 
   @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  insuranceAmount: number;
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
   allowance: number;
 
   @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
