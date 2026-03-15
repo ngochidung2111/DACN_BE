@@ -90,7 +90,9 @@ export class RoomService {
     if (updateRoomDto.location !== undefined) {
       room.location = updateRoomDto.location;
     }
-
+    if (updateRoomDto.status !== undefined) {
+      room.status = updateRoomDto.status;
+    }
     return this.roomRepository.save(room);
   }
 
