@@ -5,6 +5,7 @@ import { LessThanOrEqual, MoreThan, Repository } from 'typeorm';
 import { Room } from '../entity/room.entity';
 import { Booking } from '../entity/booking.entity';
 import { BOOKING_STATUS, ROOM_STATUS } from '../entity/constants';
+import { log } from 'console';
 
 @Injectable()
 export class RoomStatusScheduler {
@@ -26,7 +27,8 @@ export class RoomStatusScheduler {
   @Cron(CronExpression.EVERY_MINUTE)
   async syncRoomStatus(): Promise<void> {
     const now = new Date();
-
+    console.log(now);
+    
     const rooms = await this.roomRepository.find();
     if (rooms.length === 0) return;
 
@@ -54,6 +56,7 @@ export class RoomStatusScheduler {
       if (room.status !== targetStatus) {
         room.status = targetStatus;
         toUpdate.push(room);
+        this.logger.log(`Room "${room.name}" status changed to ${room.status}`);
       }
     }
 

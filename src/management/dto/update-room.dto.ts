@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNumber, IsArray, IsOptional, Min, IsUrl } from 'class-validator';
+import { IsString, IsNumber, IsArray, IsOptional, Min, IsUrl, IsEnum } from 'class-validator';
+import { ROOM_STATUS } from '../entity/constants';
 
 export class UpdateRoomDto {
   @ApiProperty({ description: 'Room name', example: 'Meeting Room A', required: false })
@@ -36,4 +37,10 @@ export class UpdateRoomDto {
   @IsString()
   @IsOptional()
   location?: string;
+
+  @ApiProperty({ description: 'Room status', example: ROOM_STATUS.AVAILABLE, required: false, enum: ROOM_STATUS })
+  @IsEnum(ROOM_STATUS)
+  @IsOptional()
+  status?: ROOM_STATUS;
+
 }
