@@ -8,6 +8,7 @@ import { AttendanceController } from './controller/attendance.controller';
 import { PayrollController } from './controller/payroll.controller';
 import { LeaveRequestController } from './controller/leave-request.controller';
 import { AssetController } from './controller/asset.controller';
+import { TicketController } from './controller/ticket.controller';
 import { ManagementService } from './service/management.service';
 import { BookingService } from './service/booking.service';
 import { RoomService } from './service/room.service';
@@ -15,6 +16,7 @@ import { AttendanceService } from './service/attendance.service';
 import { PayrollService } from './service/payroll.service';
 import { LeaveRequestService } from './service/leave-request.service';
 import { AssetService } from './service/asset.service';
+import { TicketService } from './service/ticket.service';
 import { RoomStatusScheduler } from './service/room-status.scheduler';
 import { Booking } from './entity/booking.entity';
 import { Room } from './entity/room.entity';
@@ -23,6 +25,8 @@ import { Payroll } from './entity/payroll.entity';
 import { LeaveRequest } from './entity/leave-request.entity';
 import { Asset } from './entity/asset.entity';
 import { AssetAssignment } from './entity/asset-assignment.entity';
+import { Ticket } from './entity/ticket.entity';
+import { TicketProcess } from './entity/ticket-process.entity';
 import { AuthModule } from '../auth/auth.module';
 import { SharedModule } from '../shared/shared.module';
 import { Employee } from '../auth/entity/employee.entity';
@@ -37,6 +41,8 @@ import { Employee } from '../auth/entity/employee.entity';
       LeaveRequest,
       Asset,
       AssetAssignment,
+      Ticket,
+      TicketProcess,
       Employee,
     ]),
     AuthModule,
@@ -50,6 +56,7 @@ import { Employee } from '../auth/entity/employee.entity';
     AttendanceController,
     PayrollController,
     LeaveRequestController,
+    TicketController,
     AssetController,
   ],
   providers: [
@@ -59,6 +66,7 @@ import { Employee } from '../auth/entity/employee.entity';
     AttendanceService,
     PayrollService,
     LeaveRequestService,
+    TicketService,
     AssetService,
     RoomStatusScheduler,
   ],

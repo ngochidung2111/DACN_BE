@@ -27,7 +27,6 @@ export class RoomStatusScheduler {
   @Cron(CronExpression.EVERY_MINUTE)
   async syncRoomStatus(): Promise<void> {
     const now = new Date();
-    console.log(now);
     
     const rooms = await this.roomRepository.find();
     if (rooms.length === 0) return;
