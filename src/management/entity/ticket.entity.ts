@@ -1,7 +1,15 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 
 import { Employee } from '../../auth/entity/employee.entity';
 import { TICKET_CATEGORY, TICKET_STATUS } from './constants';
+import { TicketProcess } from './ticket-process.entity';
 
 @Entity()
 export class Ticket {
@@ -33,4 +41,7 @@ export class Ticket {
 
   @Column()
   updated_at: Date;
+
+  @OneToMany(() => TicketProcess, (process) => process.ticket)
+  processes: TicketProcess[];
 }

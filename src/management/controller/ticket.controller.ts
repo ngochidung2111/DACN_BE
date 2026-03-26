@@ -1,0 +1,313 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+import { plainToInstance } from 'class-transformer';
+
+import { RolesGuard } from 'src/auth/roles.guard';
+import { ResponseBuilder } from 'src/lib/dto/response-builder.dto';
+import {
+  AssignTicketDto,
+  CreateTicketDto,
+  CreateTicketProcessDto,
+  QueryTicketDto,
+  TicketListResponseDto,
+  TicketProcessResponseDto,
+  TicketResponseDto,
+  TicketTimelineResponseDto,
+  UpdateTicketDto,
+  UpdateTicketStatusDto,
+} from '../dto';
+import { Ticket } from '../entity/ticket.entity';
+import { TicketService } from '../service/ticket.service';
+
+@Controller('management/tickets')
+@ApiTags('Tickets')
+@ApiBearerAuth()
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+export class TicketController {
+  constructor(private readonly ticketService: TicketService) {}
+
+  /**
+   * Create a new ticket
+   */
+  @Post()
+  @ApiOperation({ summary: 'Create a new support ticket' })
+  @ApiBody({ type: CreateTicketDto })
+  @ApiResponse({
+    status: 201,
+    description: 'Ticket created successfully',
+    type: TicketResponseDto,
+  })
+  async create(@Body() dto: CreateTicketDto, @Req() req: any) {
+    const employeeId = req.user.userId; // Get employee ID from JWT token
+    const ticket = await this.ticketService.createTicket(dto, employeeId);
+    return ResponseBuilder.createResponse({
+      statusCode: 201,
+      message: 'Ticket created successfully',
+      data: ticket,
+    });
+  }
+
+  /**
+   * Get list of tickets with filters
+   */
+  @Get()
+  @ApiOperation({ summary: 'Get list of tickets with filters and pagination' })
+  @ApiQuery({ type: QueryTicketDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Tickets retrieved successfully',
+    type: TicketListResponseDto,
+  })
+  async list(@Query() query: QueryTicketDto) {
+    const result = await this.ticketService.getTickets(query);
+    const data = plainToInstance(TicketListResponseDto, result, {
+      excludeExtraneousValues: true,
+    });
+
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'Tickets retrieved successfully',
+      data,
+    });
+  }
+
+  /**
+   * Get my tickets (created by current user)
+   */
+  @Get('me')
+  @ApiOperation({ summary: 'Get tickets created by current user' })
+  @ApiQuery({ type: QueryTicketDto })
+  @ApiResponse({
+    status: 200,
+    description: 'My tickets retrieved successfully',
+    type: TicketListResponseDto,
+  })
+  async getMyTickets(
+    @Query() query: Omit<QueryTicketDto, 'employee_id'>,
+    @Req() req: any,
+  ) {
+    // In real scenario, get employeeId from JWT token
+    const employeeId = req.user.userId;
+    const result = await this.ticketService.getMyTickets(employeeId, query);
+    
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'My tickets retrieved successfully',
+      data: result,
+    });
+  }
+
+  /**
+   * Get tickets assigned to current user
+   */
+  @Get('assigned/me')
+  @ApiOperation({ summary: 'Get tickets assigned to current user' })
+  @ApiQuery({ type: QueryTicketDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Assigned tickets retrieved successfully',
+    type: TicketListResponseDto,
+  })
+  async getAssignedToMe(
+    @Query() query: Omit<QueryTicketDto, 'assignee_id'>,
+    @Req() req: any,
+  ) {
+    // In real scenario, get employeeId from JWT token
+    const employeeId = req.user.userId;
+    const result = await this.ticketService.getAssignedToMe(employeeId, query);
+    const data = plainToInstance(TicketListResponseDto, result, {
+      excludeExtraneousValues: true,
+    });
+
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'Assigned tickets retrieved successfully',
+      data,
+    });
+  }
+
+  /**
+   * Get ticket statistics
+   */
+  @Get('stats')
+  @ApiOperation({ summary: 'Get ticket statistics' })
+  @ApiResponse({
+    status: 200,
+    description: 'Statistics retrieved successfully',
+  })
+  async getStats() {
+    const stats = await this.ticketService.getTicketStats();
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'Statistics retrieved successfully',
+      data: stats,
+    });
+  }
+
+  /**
+   * Get ticket by ID
+   */
+  @Get(':id')
+  @ApiOperation({ summary: 'Get ticket details by ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Ticket retrieved successfully',
+    type: TicketResponseDto,
+  })
+  async getById(@Param('id') id: string) {
+    const ticket = await this.ticketService.getTicketById(id);
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'Ticket retrieved successfully',
+      data: ticket,
+    });
+  }
+
+  /**
+   * Update ticket (title, description, category)
+   */
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update ticket details' })
+  @ApiBody({ type: UpdateTicketDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Ticket updated successfully',
+    type: TicketResponseDto,
+  })
+  async update(@Param('id') id: string, @Body() dto: UpdateTicketDto) {
+    const ticket = await this.ticketService.updateTicket(id, dto);
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'Ticket updated successfully',
+      data: ticket,
+    });
+  }
+
+  /**
+   * Delete ticket
+   */
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete a ticket' })
+  @ApiResponse({
+    status: 200,
+    description: 'Ticket deleted successfully',
+  })
+  async delete(@Param('id') id: string) {
+    await this.ticketService.deleteTicket(id);
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'Ticket deleted successfully',
+      data: null,
+    });
+  }
+
+  /**
+   * Assign ticket to an employee
+   */
+  @Patch(':id/assign')
+  @ApiOperation({ summary: 'Assign ticket to an employee' })
+  @ApiBody({ type: AssignTicketDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Ticket assigned successfully',
+    type: TicketResponseDto,
+  })
+  async assign(@Param('id') id: string, @Body() dto: AssignTicketDto) {
+    const ticket = await this.ticketService.assignTicket(id, dto);
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'Ticket assigned successfully',
+      data: ticket,
+    });
+  }
+
+  /**
+   * Update ticket status
+   */
+  @Patch(':id/status')
+  @ApiOperation({ summary: 'Update ticket status' })
+  @ApiBody({ type: UpdateTicketStatusDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Ticket status updated successfully',
+    type: TicketResponseDto,
+  })
+  async updateStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateTicketStatusDto,
+  ) {
+    // In real scenario, get actorId from JWT token
+    const actorId = '550e8400-e29b-41d4-a716-446655440000'; // Placeholder
+    const ticket = await this.ticketService.updateTicketStatus(id, dto, actorId);
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'Ticket status updated successfully',
+      data: ticket,
+    });
+  }
+
+  /**
+   * Add process/comment to ticket
+   */
+  @Post(':id/processes')
+  @ApiOperation({ summary: 'Add a process/comment to ticket' })
+  @ApiBody({ type: CreateTicketProcessDto })
+  @ApiResponse({
+    status: 201,
+    description: 'Process added successfully',
+    type: TicketProcessResponseDto,
+  })
+  async addProcess(
+    @Param('id') id: string,
+    @Body() dto: CreateTicketProcessDto,
+    @Req() req: any,
+  ) {
+    // In real scenario, get actorId from JWT token
+    const actorId = req.user.userId     ; // Assuming the user ID is stored in the request object
+
+    const process = await this.ticketService.addTicketProcess(id, dto, actorId);
+    return ResponseBuilder.createResponse({
+      statusCode: 201,
+      message: 'Process added successfully',
+      data: process,
+    });
+  }
+
+  /**
+   * Get ticket timeline/processes
+   */
+  @Get(':id/processes')
+  @ApiOperation({ summary: 'Get ticket timeline/process history' })
+  @ApiResponse({
+    status: 200,
+    description: 'Timeline retrieved successfully',
+    type: TicketTimelineResponseDto,
+  })
+  async getTimeline(@Param('id') id: string) {
+    const timeline = await this.ticketService.getTicketTimeline(id);
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'Timeline retrieved successfully',
+      data: timeline,
+    });
+  }
+}
