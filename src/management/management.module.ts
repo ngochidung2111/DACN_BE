@@ -9,6 +9,7 @@ import { PayrollController } from './controller/payroll.controller';
 import { LeaveRequestController } from './controller/leave-request.controller';
 import { AssetController } from './controller/asset.controller';
 import { TicketController } from './controller/ticket.controller';
+import { ReportController } from './controller/report.controller';
 import { ManagementService } from './service/management.service';
 import { BookingService } from './service/booking.service';
 import { RoomService } from './service/room.service';
@@ -17,6 +18,7 @@ import { PayrollService } from './service/payroll.service';
 import { LeaveRequestService } from './service/leave-request.service';
 import { AssetService } from './service/asset.service';
 import { TicketService } from './service/ticket.service';
+import { ReportService } from './service/report.service';
 import { RoomStatusScheduler } from './service/room-status.scheduler';
 import { Booking } from './entity/booking.entity';
 import { Room } from './entity/room.entity';
@@ -26,10 +28,13 @@ import { LeaveRequest } from './entity/leave-request.entity';
 import { Asset } from './entity/asset.entity';
 import { AssetAssignment } from './entity/asset-assignment.entity';
 import { Ticket } from './entity/ticket.entity';
+import { Report } from './entity/report.entity';
 import { TicketProcess } from './entity/ticket-process.entity';
+import { TicketCategory } from './entity/ticket-category.entity';
 import { AuthModule } from '../auth/auth.module';
 import { SharedModule } from '../shared/shared.module';
 import { Employee } from '../auth/entity/employee.entity';
+import { Department } from '../auth/entity/department.entity';
 
 @Module({
   imports: [
@@ -42,8 +47,11 @@ import { Employee } from '../auth/entity/employee.entity';
       Asset,
       AssetAssignment,
       Ticket,
+      Report,
       TicketProcess,
+      TicketCategory,
       Employee,
+      Department,
     ]),
     AuthModule,
     ScheduleModule.forRoot(),
@@ -56,8 +64,10 @@ import { Employee } from '../auth/entity/employee.entity';
     AttendanceController,
     PayrollController,
     LeaveRequestController,
+    ReportController,
     TicketController,
     AssetController,
+    ReportController,
   ],
   providers: [
     ManagementService,
@@ -68,6 +78,7 @@ import { Employee } from '../auth/entity/employee.entity';
     LeaveRequestService,
     TicketService,
     AssetService,
+    ReportService,
     RoomStatusScheduler,
   ],
 })

@@ -1,28 +1,23 @@
-export * from './create-booking.dto';
-export * from './update-booking.dto';
-export * from './booking-response.dto';
-export * from './create-room.dto';
-export * from './update-room.dto';
-export * from './room-response.dto';
-export * from './payroll-month.dto';
-export * from './create-leave-request.dto';
-export * from './query-leave-request.dto';
-export * from './process-leave-request.dto';
-export * from './leave-request-list.dto';
-export * from './update-leave-request.dto';
-export * from './create-asset.dto';
-export * from './update-asset.dto';
-export * from './query-asset.dto';
-export * from './assign-asset.dto';
-export * from './return-asset.dto';
-export * from './transfer-asset.dto';
-export * from './update-asset-condition.dto';
-export * from './update-asset-location.dto';
-export * from './create-ticket.dto';
-export * from './update-ticket.dto';
-export * from './assign-ticket.dto';
-export * from './update-ticket-status.dto';
-export * from './create-ticket-process.dto';
-export * from './query-ticket.dto';
-export * from './ticket-response.dto';
-export * from './ticket-process-response.dto';
+// Ticket DTOs
+export * from './ticket';
+
+// Asset DTOs
+export * from './asset';
+
+// Attendance DTOs
+export * from './attendance';
+
+// Booking DTOs
+export * from './booking';
+
+// Leave Request DTOs
+export * from './leave-request';
+
+// Room DTOs
+export * from './room';
+
+// Payroll DTOs
+export * from './payroll';
+
+// Report DTOs
+export * from './report';

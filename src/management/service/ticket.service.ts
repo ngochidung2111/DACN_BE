@@ -1,16 +1,21 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 
+import { Department } from 'src/auth/entity/department.entity';
 import { Employee } from 'src/auth/entity/employee.entity';
 import {
+  AssignDepartmentTicketCategoriesDto,
   AssignTicketDto,
   CreateTicketDto,
+  CreateTicketCategoryDto,
   CreateTicketProcessDto,
+  QueryTicketCategoryDto,
   QueryTicketDto,
   TicketListResponseDto,
   TicketResponseDto,
@@ -18,6 +23,7 @@ import {
   UpdateTicketStatusDto,
 } from '../dto';
 import { Ticket } from '../entity/ticket.entity';
+import { TicketCategory } from '../entity/ticket-category.entity';
 import { TicketProcess, TICKET_PROCESS_TYPE } from '../entity/ticket-process.entity';
 import { TICKET_STATUS } from '../entity/constants';
 import { plainToInstance } from 'class-transformer';
@@ -29,6 +35,10 @@ export class TicketService {
     private readonly ticketRepository: Repository<Ticket>,
     @InjectRepository(TicketProcess)
     private readonly ticketProcessRepository: Repository<TicketProcess>,
+    @InjectRepository(TicketCategory)
+    private readonly ticketCategoryRepository: Repository<TicketCategory>,
+    @InjectRepository(Department)
+    private readonly departmentRepository: Repository<Department>,
     @InjectRepository(Employee)
     private readonly employeeRepository: Repository<Employee>,
     private readonly dataSource: DataSource,
@@ -43,13 +53,14 @@ export class TicketService {
     await queryRunner.startTransaction();
 
     try {
-      // Verify employee exists
-      const employee = await this.findEmployeeOrThrow(employeeId);
+      // Verify employee exists and determine department-level category permissions
+      const employee = await this.findEmployeeWithDepartmentOrThrow(employeeId);
+      const category = await this.findAllowedCategoryOrThrow(dto.category_id, employee);
 
       // Create ticket
       const ticket = queryRunner.manager.create(Ticket, {
         employee,
-        category: dto.category,
+        category,
         title: dto.title.trim(),
         description: dto.description.trim(),
         status: TICKET_STATUS.OPEN,
@@ -93,14 +104,17 @@ export class TicketService {
       .createQueryBuilder('ticket')
       .leftJoinAndSelect('ticket.employee', 'employee')
       .leftJoinAndSelect('ticket.assignee', 'assignee')
-      .leftJoinAndSelect('ticket.processes', 'processes');
+      .leftJoinAndSelect('ticket.category', 'category')
+      .leftJoinAndSelect('ticket.processes', 'processes')
+      .leftJoinAndSelect('processes.actor', 'process_actor')
+      .leftJoinAndSelect('processes.assignee', 'process_assignee');
 
     if (query.status) {
       qb.andWhere('ticket.status = :status', { status: query.status });
     }
 
-    if (query.category) {
-      qb.andWhere('ticket.category = :category', { category: query.category });
+    if (query.category_id) {
+      qb.andWhere('category.id = :category_id', { category_id: query.category_id });
     }
 
     if (query.employee_id) {
@@ -153,7 +167,16 @@ export class TicketService {
   async getTicketById(ticketId: string): Promise<Ticket> {
     const ticket = await this.ticketRepository.findOne({
       where: { id: ticketId },
-      relations: ['employee', 'assignee', 'processes'],
+      relations: [
+        'employee',
+        'employee.department',
+        'employee.department.ticketCategories',
+        'assignee',
+        'category',
+        'processes',
+        'processes.actor',
+        'processes.assignee',
+      ],
     });
 
     if (!ticket) {
@@ -177,8 +200,17 @@ export class TicketService {
       ticket.description = dto.description.trim();
     }
 
-    if (dto.category !== undefined) {
-      ticket.category = dto.category;
+    if (dto.category_id !== undefined) {
+      const fullTicket = await this.ticketRepository.findOne({
+        where: { id: ticketId },
+        relations: ['employee', 'employee.department', 'employee.department.ticketCategories'],
+      });
+
+      if (!fullTicket) {
+        throw new NotFoundException(`Ticket with ID ${ticketId} not found`);
+      }
+
+      ticket.category = await this.findAllowedCategoryOrThrow(dto.category_id, fullTicket.employee);
     }
 
     ticket.updated_at = new Date();
@@ -305,7 +337,23 @@ export class TicketService {
     dto: CreateTicketProcessDto,
     actorId: string,
   ): Promise<TicketProcess> {
-    const ticket = await this.getTicketById(ticketId);
+    const ticket = await this.ticketRepository.findOne({
+      where: { id: ticketId },
+      relations: ['assignee'],
+    });
+
+    if (!ticket) {
+      throw new NotFoundException(`Ticket with ID ${ticketId} not found`);
+    }
+
+    if (!ticket.assignee) {
+      throw new ForbiddenException('Ticket is not assigned yet, cannot add process');
+    }
+
+    if (ticket.assignee.id !== actorId) {
+      throw new ForbiddenException('Only the assigned employee can add a ticket process');
+    }
+
     const actor = await this.findEmployeeOrThrow(actorId);
 
     const process = this.ticketProcessRepository.create({
@@ -316,7 +364,18 @@ export class TicketService {
       created_at: new Date(),
     });
 
-    return this.ticketProcessRepository.save(process);
+    const savedProcess = await this.ticketProcessRepository.save(process);
+
+    const hydratedProcess = await this.ticketProcessRepository.findOne({
+      where: { id: savedProcess.id },
+      relations: ['actor', 'assignee'],
+    });
+
+    if (!hydratedProcess) {
+      throw new NotFoundException(`Ticket process with ID ${savedProcess.id} not found`);
+    }
+
+    return hydratedProcess;
   }
 
   /**
@@ -371,9 +430,10 @@ export class TicketService {
 
     const qb2 = this.ticketRepository.createQueryBuilder('ticket');
     const statsByCategory = await qb2
-      .select('ticket.category', 'category')
+      .leftJoin('ticket.category', 'category')
+      .select('category.name', 'category')
       .addSelect('COUNT(*)', 'count')
-      .groupBy('ticket.category')
+      .groupBy('category.name')
       .getRawMany();
 
     const total = await this.ticketRepository.count();
@@ -399,8 +459,124 @@ export class TicketService {
 
     return employee;
   }
-}
-function leftJoinAndSelect(arg0: string, arg1: string) {
-  throw new Error('Function not implemented.');
+
+  private async findEmployeeWithDepartmentOrThrow(employeeId: string): Promise<Employee> {
+    const employee = await this.employeeRepository.findOne({
+      where: { id: employeeId },
+      relations: ['department', 'department.ticketCategories'],
+    });
+
+    if (!employee) {
+      throw new NotFoundException(`Employee with ID ${employeeId} not found`);
+    }
+
+    if (!employee.department) {
+      throw new BadRequestException('Employee is not assigned to any department');
+    }
+
+    return employee;
+  }
+
+  private async findAllowedCategoryOrThrow(
+    categoryId: string,
+    employee: Employee,
+  ): Promise<TicketCategory> {
+    if (!employee.department) {
+      throw new BadRequestException('Employee is not assigned to any department');
+    }
+
+    const category = await this.ticketCategoryRepository.findOne({
+      where: { id: categoryId, is_active: true },
+      relations: ['departments'],
+    });
+
+    if (!category) {
+      throw new NotFoundException(`Ticket category with ID ${categoryId} not found`);
+    }
+
+    const isAllowed = category.departments.some(
+      (department) => department.id === employee.department.id,
+    );
+
+    if (!isAllowed) {
+      throw new ForbiddenException('Your department cannot use this ticket category');
+    }
+
+    return category;
+  }
+
+  async createTicketCategory(dto: CreateTicketCategoryDto): Promise<TicketCategory> {
+    const normalizedName = dto.name.trim();
+    if (!normalizedName) {
+      throw new BadRequestException('Category name is required');
+    }
+
+    const existing = await this.ticketCategoryRepository.findOne({
+      where: { name: normalizedName },
+    });
+
+    if (existing) {
+      throw new BadRequestException('Ticket category name already exists');
+    }
+
+    const category = this.ticketCategoryRepository.create({
+      name: normalizedName,
+      description: dto.description?.trim() || null,
+      is_active: true,
+    });
+
+    return this.ticketCategoryRepository.save(category);
+  }
+
+  async getTicketCategories(query: QueryTicketCategoryDto) {
+    const qb = this.ticketCategoryRepository
+      .createQueryBuilder('category')
+      .leftJoinAndSelect('category.departments', 'department')
+      .where('category.is_active = :isActive', { isActive: true })
+      .orderBy('category.name', 'ASC');
+
+    if (query.department_id) {
+      qb.andWhere('department.id = :department_id', {
+        department_id: query.department_id,
+      });
+    }
+
+    return qb.getMany();
+  }
+
+  async getAllTicketCategories(): Promise<TicketCategory[]> {
+    return this.ticketCategoryRepository.find({
+      relations: ['departments'],
+      order: { name: 'ASC' },
+    });
+  }
+
+  async assignTicketCategoriesToDepartment(
+    departmentId: string,
+    dto: AssignDepartmentTicketCategoriesDto,
+  ): Promise<Department> {
+    const department = await this.departmentRepository.findOne({
+      where: { id: departmentId },
+      relations: ['ticketCategories'],
+    });
+
+    if (!department) {
+      throw new NotFoundException(`Department with ID ${departmentId} not found`);
+    }
+
+    const categories = await this.ticketCategoryRepository.find({
+      where: {
+        id: In(dto.category_ids),
+        is_active: true,
+      },
+    });
+
+    if (categories.length !== dto.category_ids.length) {
+      throw new BadRequestException('One or more category IDs are invalid or inactive');
+    }
+
+    department.ticketCategories = categories;
+    return this.departmentRepository.save(department);
+  }
 }
 

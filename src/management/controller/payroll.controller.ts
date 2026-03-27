@@ -3,7 +3,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { RolesGuard } from 'src/auth/roles.guard';
 import { ResponseBuilder } from 'src/lib/dto/response-builder.dto';
-import { PayrollMonthDto } from '../dto/payroll-month.dto';
+import { PayrollMonthDto } from '../dto/payroll';
 import { PayrollService } from '../service/payroll.service';
 
 @ApiTags('Payroll')

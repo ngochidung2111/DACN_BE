@@ -4,10 +4,10 @@ import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from 'src/auth/roles.guard';
 import { AttendanceService } from '../service/attendance.service';
 import { ResponseBuilder } from 'src/lib/dto/response-builder.dto';
-import { AttendanceDto } from '../dto/attendance.dto';
+import { AttendanceDto } from '../dto/attendance';
 import { plainToInstance } from 'class-transformer';
-import { QueryAttendanceDto } from '../dto/query-attendance.dto';
-import { MonthlyAttendanceSummaryQueryDto } from '../dto/monthly-attendance-summary-query.dto';
+import { QueryAttendanceDto } from '../dto/attendance';
+import { MonthlyAttendanceSummaryQueryDto } from '../dto/attendance';
 
 @ApiTags('Attendance')
 @Controller('attendance')

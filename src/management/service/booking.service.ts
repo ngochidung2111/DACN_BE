@@ -3,13 +3,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { Booking } from '../entity/booking.entity';
 import { Room } from '../entity/room.entity';
-import { BookingResponseDto, CreateBookingDto, UpdateBookingDto } from '../dto';
+import { BookingResponseDto, CreateBookingDto, UpdateBookingDto } from '../dto/booking';
 import { BOOKING_STATUS, BOOKING_PATTERN } from '../entity/constants';
 import { plainToInstance } from 'class-transformer';
 import { EmployeeService } from 'src/auth/service/employee.service';
 import { Employee } from 'src/auth/entity/employee.entity';
 import e from 'express';
-import { BookingResponseShortDto } from '../dto/booking-response-short.dto';
+import { BookingResponseShortDto } from '../dto/booking';
 
 @Injectable()
 export class BookingService {
