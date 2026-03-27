@@ -8,7 +8,8 @@ import {
 } from 'typeorm';
 
 import { Employee } from '../../auth/entity/employee.entity';
-import { TICKET_CATEGORY, TICKET_STATUS } from './constants';
+import { TICKET_STATUS } from './constants';
+import { TicketCategory } from './ticket-category.entity';
 import { TicketProcess } from './ticket-process.entity';
 
 @Entity()
@@ -24,8 +25,9 @@ export class Ticket {
   @JoinColumn({ name: 'assignee_id' })
   assignee: Employee;
 
-  @Column()
-  category: TICKET_CATEGORY;
+  @ManyToOne(() => TicketCategory)
+  @JoinColumn({ name: 'category_id' })
+  category: TicketCategory;
 
   @Column()
   title: string;
@@ -33,7 +35,7 @@ export class Ticket {
   @Column('text')
   description: string;
 
-  @Column()
+  @Column({default: TICKET_STATUS.OPEN})
   status: TICKET_STATUS;
 
   @Column()

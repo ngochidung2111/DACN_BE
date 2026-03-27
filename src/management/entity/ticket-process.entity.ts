@@ -37,7 +37,7 @@ export class TicketProcess {
   @Column()
   created_at: Date;
 
-  @Column()
+  @Column({default: TICKET_STATUS.OPEN})
   status: TICKET_STATUS;
   
 }

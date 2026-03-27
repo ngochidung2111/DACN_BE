@@ -24,10 +24,14 @@ import { plainToInstance } from 'class-transformer';
 import { RolesGuard } from 'src/auth/roles.guard';
 import { ResponseBuilder } from 'src/lib/dto/response-builder.dto';
 import {
+  AssignDepartmentTicketCategoriesDto,
   AssignTicketDto,
   CreateTicketDto,
+  CreateTicketCategoryDto,
   CreateTicketProcessDto,
+  QueryTicketCategoryDto,
   QueryTicketDto,
+  TicketCategoryResponseDto,
   TicketListResponseDto,
   TicketProcessResponseDto,
   TicketResponseDto,
@@ -46,6 +50,90 @@ export class TicketController {
   constructor(private readonly ticketService: TicketService) {}
 
   /**
+   * Create a new ticket category
+   */
+  @Post('categories')
+  @ApiOperation({ summary: 'Create a new ticket category' })
+  @ApiBody({ type: CreateTicketCategoryDto })
+  @ApiResponse({
+    status: 201,
+    description: 'Ticket category created successfully',
+    type: TicketCategoryResponseDto,
+  })
+  async createCategory(@Body() dto: CreateTicketCategoryDto) {
+    const category = await this.ticketService.createTicketCategory(dto);
+    return ResponseBuilder.createResponse({
+      statusCode: 201,
+      message: 'Ticket category created successfully',
+      data: category,
+    });
+  }
+
+  /**
+   * List ticket categories
+   */
+  @Get('categories')
+  @ApiOperation({ summary: 'Get available ticket categories' })
+  @ApiResponse({
+    status: 200,
+    description: 'Ticket categories retrieved successfully',
+    type: [TicketCategoryResponseDto],
+  })
+  async getCategories(@Query() query: QueryTicketCategoryDto) {
+    const categories = await this.ticketService.getTicketCategories(query);
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'Ticket categories retrieved successfully',
+      data: categories,
+    });
+  }
+
+  /**
+   * List all ticket categories
+   */
+  @Get('categories/all')
+  @ApiOperation({ summary: 'Get all ticket categories' })
+  @ApiResponse({
+    status: 200,
+    description: 'All ticket categories retrieved successfully',
+    type: [TicketCategoryResponseDto],
+  })
+  async getAllCategories() {
+    const categories = await this.ticketService.getAllTicketCategories();
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'All ticket categories retrieved successfully',
+      data: categories,
+    });
+  }
+
+  /**
+   * Set ticket categories managed by a department
+   */
+  @Patch('departments/:departmentId/categories')
+  @ApiOperation({ summary: 'Assign ticket categories to a department' })
+  @ApiBody({ type: AssignDepartmentTicketCategoriesDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Department ticket categories updated successfully',
+  })
+  async assignCategoriesToDepartment(
+    @Param('departmentId') departmentId: string,
+    @Body() dto: AssignDepartmentTicketCategoriesDto,
+  ) {
+    const department = await this.ticketService.assignTicketCategoriesToDepartment(
+      departmentId,
+      dto,
+    );
+
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'Department ticket categories updated successfully',
+      data: department,
+    });
+  }
+
+  /**
    * Create a new ticket
    */
   @Post()
@@ -62,7 +150,7 @@ export class TicketController {
     return ResponseBuilder.createResponse({
       statusCode: 201,
       message: 'Ticket created successfully',
-      data: ticket,
+      data: plainToInstance(TicketResponseDto, ticket, { excludeExtraneousValues: true }),
     });
   }
 
@@ -71,7 +159,6 @@ export class TicketController {
    */
   @Get()
   @ApiOperation({ summary: 'Get list of tickets with filters and pagination' })
-  @ApiQuery({ type: QueryTicketDto })
   @ApiResponse({
     status: 200,
     description: 'Tickets retrieved successfully',
@@ -108,6 +195,7 @@ export class TicketController {
     // In real scenario, get employeeId from JWT token
     const employeeId = req.user.userId;
     const result = await this.ticketService.getMyTickets(employeeId, query);
+    console.log(employeeId);
     
     return ResponseBuilder.createResponse({
       statusCode: 200,

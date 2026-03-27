@@ -2,11 +2,11 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EmployeeService } from 'src/auth/service/employee.service';
-import { CreateLeaveRequestDto, LeaveRequestListDto, ProcessLeaveRequestDto, QueryLeaveRequestDto, UpdateLeaveRequestDto } from '../dto';
+import { CreateLeaveRequestDto, LeaveRequestListDto, ProcessLeaveRequestDto, QueryLeaveRequestDto, UpdateLeaveRequestDto } from '../dto/leave-request';
 import { LeaveRequest } from '../entity/leave-request.entity';
 import { LEAVE_REQUEST_STATUS, ROLE } from '../entity/constants';
 import { plainToInstance } from 'class-transformer';
-import { LeaveRequestDto } from '../dto/leave-request.dto';
+import { LeaveRequestDto } from '../dto/leave-request';
 
 @Injectable()
 export class LeaveRequestService {

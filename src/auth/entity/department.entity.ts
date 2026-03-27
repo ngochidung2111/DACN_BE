@@ -1,5 +1,13 @@
-import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import {
+  Column,
+  Entity,
+  JoinTable,
+  ManyToMany,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { Employee } from "./employee.entity";
+import { TicketCategory } from '../../management/entity/ticket-category.entity';
 
 
 
@@ -13,4 +21,12 @@ export class Department {
 
   @OneToMany(() => Employee, (employee) => employee.department)
   employees: Employee[];
+
+  @ManyToMany(() => TicketCategory, (category) => category.departments)
+  @JoinTable({
+    name: 'department_ticket_categories',
+    joinColumn: { name: 'department_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'category_id', referencedColumnName: 'id' },
+  })
+  ticketCategories: TicketCategory[];
 }

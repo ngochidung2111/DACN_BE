@@ -5,6 +5,7 @@ export * from './asset.entity';
 export * from './asset-assignment.entity';
 export * from './ticket.entity';
 export * from './ticket-process.entity';
+export * from './ticket-category.entity';
 
 export * from './notification.entity';
 export * from './company-announcement.entity';
