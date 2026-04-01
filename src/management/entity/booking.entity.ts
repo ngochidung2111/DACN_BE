@@ -1,7 +1,7 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, JoinColumn, JoinTable, ManyToMany, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 
 import { Employee } from '../../auth/entity/employee.entity';
-import { BOOKING_STATUS } from './constants';
+import { BOOKING_PATTERN, BOOKING_STATUS } from './constants';
 import { Room } from './room.entity';
 
 @Entity()
@@ -17,6 +17,14 @@ export class Booking {
   @JoinColumn({ name: 'employee_id' })
   employee: Employee;
 
+  @ManyToMany(() => Employee)
+  @JoinTable({
+    name: 'booking_attendees',
+    joinColumn: { name: 'booking_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'employee_id', referencedColumnName: 'id' },
+  })
+  attendees: Employee[];
+
   @Column()
   start_time: Date;
 
@@ -26,15 +34,15 @@ export class Booking {
   @Column()
   purpose: string;
 
-  @Column()
+  @Column({ type: 'enum', enum: BOOKING_STATUS })
   status: BOOKING_STATUS;
 
-  @Column({ nullable: true })
-  recurring_pattern: string; // DAILY, WEEKLY, MONTHLY or null for non-recurring
+  @Column({ type: 'enum', enum: BOOKING_PATTERN, nullable: true })
+  recurring_pattern?: BOOKING_PATTERN | null; // DAILY, WEEKLY, MONTHLY or null for non-recurring
 
-  @Column({ nullable: true })
-  recurring_end_date: Date; // End date for recurring bookings
+  @Column({ type: 'datetime', nullable: true })
+  recurring_end_date?: Date | null; // End date for recurring bookings
 
-  @Column({ nullable: true })
-  parent_booking_id: string; // Parent ID if this is a generated recurring booking
+  @Column({ type: 'char', length: 36, nullable: true })
+  parent_booking_id?: string | null; // Parent ID if this is a generated recurring booking
 }

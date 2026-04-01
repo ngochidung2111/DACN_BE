@@ -18,6 +18,9 @@ export class CompanyAnnouncement {
   @Column('text')
   content: string;
 
+  @Column('json', { nullable: true })
+  image_urls?: string[] | null;
+
   @Column()
   category: ANNOUNCEMENT_CATEGORY;
 

@@ -8,7 +8,6 @@ import { BOOKING_STATUS, BOOKING_PATTERN } from '../entity/constants';
 import { plainToInstance } from 'class-transformer';
 import { EmployeeService } from 'src/auth/service/employee.service';
 import { Employee } from 'src/auth/entity/employee.entity';
-import e from 'express';
 import { BookingResponseShortDto } from '../dto/booking';
 
 @Injectable()
@@ -56,9 +55,18 @@ export class BookingService {
     employeeId: string,
     createBookingDto: CreateBookingDto,
   ) {
-    const { room_id, start_time, end_time, purpose, recurring_pattern, recurring_end_date } =
+    const {
+      room_id,
+      start_time,
+      end_time,
+      purpose,
+      recurring_pattern,
+      recurring_end_date,
+      attendee_ids,
+    } =
       createBookingDto;
     const employee = await this.employeeService.findById(employeeId);
+    const attendees = await this.resolveAttendees(attendee_ids);
     // Validate thời gian
     const startDate = new Date(start_time);
     const endDate = new Date(end_time);
@@ -77,7 +85,14 @@ export class BookingService {
     if (!recurring_pattern) {
       
       
-      const booking = await this.createSingleBooking(employee, room, startDate, endDate, purpose);
+      const booking = await this.createSingleBooking(
+        employee,
+        room,
+        startDate,
+        endDate,
+        purpose,
+        attendees,
+      );
       return plainToInstance(BookingResponseDto, booking, {
         excludeExtraneousValues: true,
       });
@@ -100,6 +115,7 @@ export class BookingService {
       startDate,
       endDate,
       purpose,
+      attendees,
       recurring_pattern as BOOKING_PATTERN,
       recurringEndDate,
     );
@@ -115,6 +131,7 @@ export class BookingService {
     startDate: Date,
     endDate: Date,
     purpose: string,
+    attendees: Employee[],
   ): Promise<Booking> {
     // Kiểm tra phòng có sẵn không
     const isAvailable = await this.checkRoomAvailability(room.id, startDate, endDate);
@@ -130,6 +147,7 @@ export class BookingService {
       status: BOOKING_STATUS.CONFIRMED,
       room: room,
       employee: employee,
+      attendees,
     });
 
 
@@ -143,6 +161,7 @@ export class BookingService {
     startDate: Date,
     endDate: Date,
     purpose: string,
+    attendees: Employee[],
     pattern: BOOKING_PATTERN,
     recurringEndDate: Date,
   ): Promise<Booking[]> {
@@ -174,6 +193,7 @@ export class BookingService {
       });
       booking.room = room;
       booking.employee = employee;
+      booking.attendees = attendees;
 
       bookings.push(booking);
 
@@ -216,12 +236,14 @@ export class BookingService {
     roomId?: string,
     employeeId?: string,
     status?: BOOKING_STATUS,
+    attendeeId?: string,
     includeOnlyParent?: boolean,
   ) {
     let query = this.bookingRepository
       .createQueryBuilder('booking')
       .leftJoinAndSelect('booking.room', 'room')
-      .leftJoinAndSelect('booking.employee', 'employee');
+      .leftJoinAndSelect('booking.employee', 'employee')
+      .leftJoinAndSelect('booking.attendees', 'attendees');
 
     if (roomId) {
       query.andWhere('booking.room.id = :roomId', { roomId });
@@ -233,6 +255,10 @@ export class BookingService {
 
     if (status) {
       query.andWhere('booking.status = :status', { status });
+    }
+
+    if (attendeeId) {
+      query.andWhere('attendees.id = :attendeeId', { attendeeId });
     }
 
     // Option để chỉ lấy parent bookings (non-recurring hoặc parent của recurring group)
@@ -248,10 +274,15 @@ export class BookingService {
   }
 
   // Lấy booking theo ID
-  async getBookingById(bookingId: string): Promise<Booking> {
+  async getBookingById(bookingId: string): Promise<BookingResponseDto> {
+    const booking = await this.getBookingEntityById(bookingId);
+    return this.toBookingResponseDto(booking);
+  }
+
+  private async getBookingEntityById(bookingId: string): Promise<Booking> {
     const booking = await this.bookingRepository.findOne({
       where: { id: bookingId },
-      relations: ['room', 'employee'],
+      relations: ['room', 'employee', 'attendees'],
     });
 
     if (!booking) {
@@ -262,8 +293,8 @@ export class BookingService {
   }
 
   // Cập nhật booking đơn lẻ
-  async updateBooking(bookingId: string, updateBookingDto: UpdateBookingDto): Promise<Booking> {
-    const booking = await this.getBookingById(bookingId);
+  async updateBooking(bookingId: string, updateBookingDto: UpdateBookingDto): Promise<BookingResponseDto> {
+    const booking = await this.getBookingEntityById(bookingId);
 
     // Nếu là booking lặp lại, không cho phép đổi thời gian
     if (booking.recurring_pattern) {
@@ -281,12 +312,33 @@ export class BookingService {
       booking.status = BOOKING_STATUS.CHECKED_OUT;
     }
 
-    return this.bookingRepository.save(booking);
+    if (updateBookingDto.attendee_ids !== undefined) {
+      booking.attendees = await this.resolveAttendees(updateBookingDto.attendee_ids);
+    }
+
+    const updatedBooking = await this.bookingRepository.save(booking);
+    return this.toBookingResponseDto(updatedBooking);
+  }
+
+  async addAttendees(bookingId: string, attendeeIds: string[]): Promise<BookingResponseDto> {
+    const booking = await this.getBookingEntityById(bookingId);
+    const attendeesToAdd = await this.resolveAttendees(attendeeIds);
+    const existingAttendees = booking.attendees ?? [];
+
+    const existingIds = new Set(existingAttendees.map((attendee) => attendee.id));
+    const mergedAttendees = [
+      ...existingAttendees,
+      ...attendeesToAdd.filter((attendee) => !existingIds.has(attendee.id)),
+    ];
+
+    booking.attendees = mergedAttendees;
+    const updatedBooking = await this.bookingRepository.save(booking);
+    return this.toBookingResponseDto(updatedBooking);
   }
 
   // Xóa booking đơn lẻ
   async deleteBooking(bookingId: string): Promise<void> {
-    const booking = await this.getBookingById(bookingId);
+    const booking = await this.getBookingEntityById(bookingId);
     await this.bookingRepository.remove(booking);
   }
 
@@ -301,7 +353,7 @@ export class BookingService {
         room: { id: roomId },
         start_time: Between(startDate, endDate),
       },
-      relations: ['room', 'employee'],
+      relations: ['room', 'employee', 'attendees'],
       order: { start_time: 'ASC' },
     });
   }
@@ -312,6 +364,7 @@ export class BookingService {
       .createQueryBuilder('booking')
       .leftJoinAndSelect('booking.room', 'room')
       .leftJoinAndSelect('booking.employee', 'employee')
+      .leftJoinAndSelect('booking.attendees', 'attendees')
       .where('booking.employee_id = :employeeId', { employeeId })
       .orderBy('booking.start_time', 'DESC');
 
@@ -335,6 +388,7 @@ export class BookingService {
       .createQueryBuilder('booking')
       .leftJoinAndSelect('booking.room', 'room')
       .leftJoinAndSelect('booking.employee', 'employee')
+      .leftJoinAndSelect('booking.attendees', 'attendees')
       .where('booking.employee_id = :employeeId', { employeeId })
       .andWhere('booking.start_time >= :now', { now })
       .andWhere('booking.start_time <= :futureDate', { futureDate })
@@ -350,17 +404,54 @@ export class BookingService {
   async findByRoom(roomId: string) {
     const bookings = await this.bookingRepository.find({
       where: { room: { id: roomId } },
-      relations: ['room', 'employee'],
+      relations: ['room', 'employee', 'attendees'],
     });
     return this.mapToBookingResponseShort(bookings);
   }
   async findByEmployee(employeeId: string) {
     const bookings = await this.bookingRepository.find({
       where: { employee: { id: employeeId } },
-      relations: ['room', 'employee'],
+      relations: ['room', 'employee', 'attendees'],
     });
     return this.mapToBookingResponseShort(bookings);
   }
+
+  async findByCreatorOrAttendee(employeeId: string): Promise<BookingResponseDto[]> {
+    const bookings = await this.bookingRepository
+      .createQueryBuilder('booking')
+      .leftJoinAndSelect('booking.room', 'room')
+      .leftJoinAndSelect('booking.employee', 'employee')
+      .leftJoinAndSelect('booking.attendees', 'attendees')
+      .where('employee.id = :employeeId', { employeeId })
+      .orWhere('attendees.id = :employeeId', { employeeId })
+      .distinct(true)
+      .orderBy('booking.start_time', 'DESC')
+      .getMany();
+
+    return plainToInstance(BookingResponseDto, bookings, {
+      excludeExtraneousValues: true,
+    });
+  }
+
+  private async resolveAttendees(attendeeIds?: string[]): Promise<Employee[]> {
+    if (!attendeeIds || attendeeIds.length === 0) {
+      return [];
+    }
+
+    const uniqueAttendeeIds = [...new Set(attendeeIds)];
+    const attendees = await Promise.all(
+      uniqueAttendeeIds.map((attendeeId) => this.employeeService.findById(attendeeId)),
+    );
+
+    return attendees;
+  }
+
+  private toBookingResponseDto(booking: Booking): BookingResponseDto {
+    return plainToInstance(BookingResponseDto, booking, {
+      excludeExtraneousValues: true,
+    });
+  }
+
   // Map booking entity to booking response short DTO
   mapToBookingResponseShort(booking: Booking): BookingResponseShortDto;
   mapToBookingResponseShort(bookings: Booking[]): BookingResponseShortDto[];
@@ -374,6 +465,7 @@ export class BookingService {
         dto.endTime = booking.end_time;
         dto.name = booking.employee?.firstName + ' '+ booking.employee?.middleName + ' ' + booking.employee?.lastName  || 'Unknown';
         dto.roomName = booking.room?.name;
+        dto.attendeeCount = booking.attendees?.length || 0;
         return dto;
       });
     }
@@ -385,6 +477,7 @@ export class BookingService {
     dto.endTime = bookingOrBookings.end_time;
     dto.name = bookingOrBookings.employee?.firstName + ' '+ bookingOrBookings.employee?.middleName + ' ' + bookingOrBookings.employee?.lastName  || 'Unknown';
     dto.roomName = bookingOrBookings.room?.name;
+    dto.attendeeCount = bookingOrBookings.attendees?.length || 0;
     return dto;
   }
 }

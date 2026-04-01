@@ -65,6 +65,23 @@ export class BookingResponseDto {
   @Type(() => EmployeeInfoDto)
   employee: EmployeeInfoDto;
 
+  @ApiProperty({
+    description: 'Attendees list',
+    required: false,
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', example: 'emp-02' },
+        name: { type: 'string', example: 'Tran Thi B' },
+        email: { type: 'string', example: 'attendee@example.com' },
+      },
+    },
+  })
+  @Expose()
+  @Type(() => EmployeeInfoDto)
+  attendees?: EmployeeInfoDto[];
+
   @ApiProperty({ description: 'Start time (ISO)', example: '2024-12-12T09:00:00Z' })
   @Expose()
   start_time: Date;
