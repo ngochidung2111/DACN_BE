@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { BookingService } from '../service/booking.service';
-import { CreateBookingDto, UpdateBookingDto, BookingResponseDto } from '../dto';
+import { AddBookingAttendeesDto, CreateBookingDto, UpdateBookingDto, BookingResponseDto } from '../dto';
 import { RolesGuard } from 'src/auth/roles.guard';
 import { AuthGuard } from '@nestjs/passport';
 import { ResponseBuilder } from 'src/lib/dto/response-builder.dto';
@@ -41,6 +41,7 @@ export class BookingController {
   @ApiOperation({ summary: 'Lấy danh sách tất cả bookings' })
   @ApiQuery({ name: 'roomId', required: false, description: 'Lọc theo ID phòng' })
   @ApiQuery({ name: 'employeeId', required: false, description: 'Lọc theo ID nhân viên' })
+  @ApiQuery({ name: 'attendeeId', required: false, description: 'Lọc theo attendee ID' })
   @ApiQuery({ name: 'status', required: false, description: 'Lọc theo trạng thái' })
   @ApiResponse({
     status: 200,
@@ -52,9 +53,15 @@ export class BookingController {
   async getAllBookings(
     @Query('roomId') roomId?: string,
     @Query('employeeId') employeeId?: string,
+    @Query('attendeeId') attendeeId?: string,
     @Query('status') status?: string,
   ) {
-    const bookings = await this.bookingService.getAllBookings(roomId, employeeId, status as any);
+    const bookings = await this.bookingService.getAllBookings(
+      roomId,
+      employeeId,
+      status as any,
+      attendeeId,
+    );
     return {
       success: true,
       data: bookings,
@@ -97,6 +104,25 @@ export class BookingController {
       data: bookings,
     });
   }
+
+  @ApiOperation({ summary: 'Lấy bookings mà nhân viên tạo hoặc tham gia' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of bookings where employee is creator or attendee',
+    type: [BookingResponseDto],
+  })
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Get('involved/me')
+  async getInvolvedBookings(@Request() req) {
+    const employeeId = req.user.userId;
+    const bookings = await this.bookingService.findByCreatorOrAttendee(employeeId);
+    return {
+      success: true,
+      data: bookings,
+      total: bookings.length,
+    };
+  }
+
   // Lấy booking theo ID
   @ApiOperation({ summary: 'Lấy thông tin booking theo ID' })
   @ApiParam({ name: 'id', description: 'Booking ID' })
@@ -136,6 +162,28 @@ export class BookingController {
     return {
       success: true,
       message: 'Booking updated successfully',
+      data: booking,
+    };
+  }
+
+  @ApiOperation({ summary: 'Thêm attendee vào booking' })
+  @ApiParam({ name: 'id', description: 'Booking ID' })
+  @ApiBody({ type: AddBookingAttendeesDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Booking attendees added successfully',
+    type: BookingResponseDto,
+  })
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Post(':id/attendees')
+  async addAttendees(
+    @Param('id') bookingId: string,
+    @Body() body: AddBookingAttendeesDto,
+  ) {
+    const booking = await this.bookingService.addAttendees(bookingId, body.attendee_ids);
+    return {
+      success: true,
+      message: 'Attendees added successfully',
       data: booking,
     };
   }

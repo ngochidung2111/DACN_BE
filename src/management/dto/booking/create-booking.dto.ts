@@ -1,5 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsUUID, IsDateString, IsString, IsNotEmpty, IsOptional, IsEnum } from 'class-validator';
+import {
+  IsUUID,
+  IsDateString,
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsEnum,
+  IsArray,
+} from 'class-validator';
 import { BOOKING_PATTERN } from '../../entity/constants';
 
 export class CreateBookingDto {
@@ -22,6 +30,20 @@ export class CreateBookingDto {
   @IsString()
   @IsNotEmpty()
   purpose: string;
+
+  @ApiProperty({
+    description: 'List of attendee employee IDs',
+    example: [
+      '6bfc3c51-1e0d-4f27-9a6c-7b32e9f482be',
+      'cb0eaf90-20fb-4f30-81a6-484eb1c7ca7b',
+    ],
+    required: false,
+    type: [String],
+  })
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @IsOptional()
+  attendee_ids?: string[];
 
   @ApiProperty({
     description: 'Recurring pattern (DAILY, WEEKLY, MONTHLY)',

@@ -22,5 +22,9 @@ export class BookingResponseShortDto {
     @Expose()
     roomName?: string;
 
+    @ApiProperty({ description: 'Number of attendees', example: 3, required: false })
+    @Expose()
+    attendeeCount?: number;
+
 
 }

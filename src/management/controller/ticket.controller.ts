@@ -342,9 +342,10 @@ export class TicketController {
   async updateStatus(
     @Param('id') id: string,
     @Body() dto: UpdateTicketStatusDto,
+    @Req() req: any,
   ) {
     // In real scenario, get actorId from JWT token
-    const actorId = '550e8400-e29b-41d4-a716-446655440000'; // Placeholder
+    const actorId = req.user.userId; // Placeholder
     const ticket = await this.ticketService.updateTicketStatus(id, dto, actorId);
     return ResponseBuilder.createResponse({
       statusCode: 200,

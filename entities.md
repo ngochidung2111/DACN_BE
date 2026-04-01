@@ -74,6 +74,7 @@
 - `employee_id`: Foreign Key, references `Employees.id` (author of the post)
 - `title`: String, title of the announcement
 - `content`: Text, content of the announcement
+- `image_urls`: JSON array (nullable), list of image URLs attached to the announcement
 - `category`: Enum, category of the announcement (e.g., "General", "HR", "Events")
 - `created_at`: DateTime, timestamp when the announcement was created
 - `pinned`: Boolean, whether the announcement is pinned to the top
