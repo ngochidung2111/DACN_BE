@@ -7,6 +7,7 @@ import { LeaveRequest } from '../entity/leave-request.entity';
 import { LEAVE_REQUEST_STATUS, ROLE } from '../entity/constants';
 import { plainToInstance } from 'class-transformer';
 import { LeaveRequestDto } from '../dto/leave-request';
+import { EMPLOYEE_SCHEDULE_ITEM_TYPE, EmployeeScheduleItemDto } from '../dto';
 
 @Injectable()
 export class LeaveRequestService {
@@ -297,6 +298,45 @@ export class LeaveRequestService {
     }
 
     return summary;
+  }
+
+  async findMyLeaveRequestsSchedule(
+    employeeId: string,
+    fromDate?: Date,
+    toDate?: Date,
+  ): Promise<EmployeeScheduleItemDto[]> {
+    await this.employeeService.findById(employeeId);
+
+    const qb = this.leaveRequestRepository
+      .createQueryBuilder('leaveRequest')
+      .leftJoinAndSelect('leaveRequest.employee', 'employee')
+      .where('employee.id = :employeeId', { employeeId })
+      .orderBy('leaveRequest.date_from', 'ASC');
+
+    if (fromDate && toDate) {
+      qb.andWhere('leaveRequest.date_from <= :toDate AND leaveRequest.date_to >= :fromDate', {
+        fromDate,
+        toDate,
+      });
+    } else if (fromDate) {
+      qb.andWhere('leaveRequest.date_to >= :fromDate', { fromDate });
+    } else if (toDate) {
+      qb.andWhere('leaveRequest.date_from <= :toDate', { toDate });
+    }
+
+    const leaveRequests = await qb.getMany();
+
+    return leaveRequests.map((leaveRequest) => {
+      const item = new EmployeeScheduleItemDto();
+      item.id = leaveRequest.id;
+      item.type = EMPLOYEE_SCHEDULE_ITEM_TYPE.LEAVE_REQUEST;
+      item.start_time = leaveRequest.date_from;
+      item.end_time = leaveRequest.date_to;
+      item.title = leaveRequest.reason;
+      item.subtitle = leaveRequest.description;
+      item.status = leaveRequest.status;
+      return item;
+    });
   }
 
   async getDepartmentLeaveSummary(managerId: string) {

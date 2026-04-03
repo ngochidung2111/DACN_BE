@@ -1,7 +1,8 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
 import { Employee } from '../../auth/entity/employee.entity';
 import { ANNOUNCEMENT_CATEGORY } from './constants';
+import { AnnouncementInteraction } from './announcement-interaction.entity';
 
 @Entity()
 export class CompanyAnnouncement {
@@ -12,6 +13,9 @@ export class CompanyAnnouncement {
   @JoinColumn({ name: 'employee_id' })
   employee: Employee;
 
+  @OneToMany(() => AnnouncementInteraction, (interaction) => interaction.announcement)
+  interactions: AnnouncementInteraction[];
+
   @Column()
   title: string;
 
@@ -21,12 +25,12 @@ export class CompanyAnnouncement {
   @Column('json', { nullable: true })
   image_urls?: string[] | null;
 
-  @Column()
+  @Column({ type: 'enum', enum: ANNOUNCEMENT_CATEGORY })
   category: ANNOUNCEMENT_CATEGORY;
 
-  @Column()
+  @CreateDateColumn()
   created_at: Date;
 
-  @Column()
+  @Column({ type: 'boolean', default: false })
   pinned: boolean;
 }

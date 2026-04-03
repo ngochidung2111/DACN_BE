@@ -9,6 +9,7 @@ import { plainToInstance } from 'class-transformer';
 import { EmployeeService } from 'src/auth/service/employee.service';
 import { Employee } from 'src/auth/entity/employee.entity';
 import { BookingResponseShortDto } from '../dto/booking';
+import { EMPLOYEE_SCHEDULE_ITEM_TYPE, EmployeeScheduleItemDto } from '../dto';
 
 @Injectable()
 export class BookingService {
@@ -430,6 +431,47 @@ export class BookingService {
 
     return plainToInstance(BookingResponseDto, bookings, {
       excludeExtraneousValues: true,
+    });
+  }
+
+  async findInvolvedBookingsSchedule(
+    employeeId: string,
+    fromDate?: Date,
+    toDate?: Date,
+  ): Promise<EmployeeScheduleItemDto[]> {
+    const qb = this.bookingRepository
+      .createQueryBuilder('booking')
+      .leftJoinAndSelect('booking.room', 'room')
+      .leftJoinAndSelect('booking.employee', 'employee')
+      .leftJoinAndSelect('booking.attendees', 'attendees')
+      .where('(employee.id = :employeeId OR attendees.id = :employeeId)', { employeeId })
+      .andWhere('booking.status != :cancelled', { cancelled: BOOKING_STATUS.CANCELLED })
+      .distinct(true)
+      .orderBy('booking.start_time', 'ASC');
+
+    if (fromDate && toDate) {
+      qb.andWhere('booking.start_time <= :toDate AND booking.end_time >= :fromDate', {
+        fromDate,
+        toDate,
+      });
+    } else if (fromDate) {
+      qb.andWhere('booking.end_time >= :fromDate', { fromDate });
+    } else if (toDate) {
+      qb.andWhere('booking.start_time <= :toDate', { toDate });
+    }
+
+    const bookings = await qb.getMany();
+
+    return bookings.map((booking) => {
+      const item = new EmployeeScheduleItemDto();
+      item.id = booking.id;
+      item.type = EMPLOYEE_SCHEDULE_ITEM_TYPE.BOOKING;
+      item.start_time = booking.start_time;
+      item.end_time = booking.end_time;
+      item.title = booking.purpose;
+      item.subtitle = booking.room?.name;
+      item.status = booking.status;
+      return item;
     });
   }
 

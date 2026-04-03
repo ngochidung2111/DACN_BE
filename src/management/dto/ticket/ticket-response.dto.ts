@@ -10,8 +10,14 @@ export class EmployeeMinimalDto {
 
   @ApiProperty({ example: 'John Doe' })
   @Expose()
-  name: string;
+  firstName: string;
+  @ApiProperty({ example: 'A.' })
+  @Expose()
+  middleName: string;
 
+  @ApiProperty({ example: 'Doe' })
+  @Expose()
+  lastName: string;
   @ApiProperty({ example: 'john.doe@example.com' })
   @Expose()
   email: string;
