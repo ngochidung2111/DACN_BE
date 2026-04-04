@@ -15,13 +15,12 @@ import {
   ApiBearerAuth,
   ApiBody,
   ApiOperation,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import { plainToInstance } from 'class-transformer';
 
-import { RolesGuard } from 'src/auth/roles.guard';
-import { ResponseBuilder } from 'src/lib/dto/response-builder.dto';
 import {
   CreateReportDto,
   UpdateReportDto,
@@ -31,6 +30,8 @@ import {
 } from '../dto';
 import { Report } from '../entity/report.entity';
 import { ReportService } from '../service/report.service';
+import { RolesGuard } from '../../auth/roles.guard';
+import { ResponseBuilder } from '../../lib/dto/response-builder.dto';
 
 @Controller('management/reports')
 @ApiTags('Reports')
@@ -88,6 +89,7 @@ export class ReportController {
     description: 'My reports retrieved successfully',
     type: ReportListResponseDto,
   })
+  @ApiQuery({ type: QueryReportDto })
   async getMyReports(
     @Query() query: Omit<QueryReportDto, 'employee_id'>,
     @Req() req: any,

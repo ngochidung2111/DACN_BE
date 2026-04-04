@@ -1,9 +1,11 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EmployeeService } from 'src/auth/service/employee.service';
+
 import { Repository } from 'typeorm';
 import { Attendance } from '../entity/attendance.entity';
 import { PAYROLL_STATUS, Payroll } from '../entity/payroll.entity';
+
+import { EmployeeService } from '../../auth/service/employee.service';
 
 @Injectable()
 export class PayrollService {

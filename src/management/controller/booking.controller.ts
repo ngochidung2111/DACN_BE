@@ -2,9 +2,10 @@ import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Requ
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { BookingService } from '../service/booking.service';
 import { AddBookingAttendeesDto, CreateBookingDto, UpdateBookingDto, BookingResponseDto } from '../dto';
-import { RolesGuard } from 'src/auth/roles.guard';
 import { AuthGuard } from '@nestjs/passport';
-import { ResponseBuilder } from 'src/lib/dto/response-builder.dto';
+import { RolesGuard } from '../../auth/roles.guard';
+import { ResponseBuilder } from '../../lib/dto/response-builder.dto';
+
 
 @ApiTags('Bookings')
 @Controller('bookings')

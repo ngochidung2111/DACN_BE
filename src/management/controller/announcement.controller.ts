@@ -2,8 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Request, Uplo
 import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Roles } from 'src/auth/roles.decorator';
-import { RolesGuard } from 'src/auth/roles.guard';
+
 import { ROLE } from '../entity/constants';
 import {
   AnnouncementListResponseDto,
@@ -15,7 +14,10 @@ import {
   UpdateAnnouncementDto,
 } from '../dto/announcement';
 import { AnnouncementService } from '../service/announcement.service';
-import { ResponseBuilder } from 'src/lib/dto/response-builder.dto';
+import { RolesGuard } from '../../auth/roles.guard';
+import { ResponseBuilder } from '../../lib/dto/response-builder.dto';
+import { Roles } from '../../auth/roles.decorator';
+
 
 @ApiTags('Announcements')
 @Controller('announcements')

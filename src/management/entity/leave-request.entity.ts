@@ -1,6 +1,7 @@
-import { Employee } from "src/auth/entity/employee.entity";
+
 import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
 import { LEAVE_REQUEST_STATUS } from "./constants";
+import { Employee } from "../../auth/entity/employee.entity";
 
 @Entity()
 export class LeaveRequest {

@@ -7,8 +7,8 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 
-import { Department } from 'src/auth/entity/department.entity';
-import { Employee } from 'src/auth/entity/employee.entity';
+
+
 import {
   AssignDepartmentTicketCategoriesDto,
   AssignTicketDto,
@@ -26,7 +26,10 @@ import { Ticket } from '../entity/ticket.entity';
 import { TicketCategory } from '../entity/ticket-category.entity';
 import { TicketProcess, TICKET_PROCESS_TYPE } from '../entity/ticket-process.entity';
 import { TICKET_STATUS } from '../entity/constants';
+import { ROLE } from '../entity/constants';
 import { plainToInstance } from 'class-transformer';
+import { Employee } from '../../auth/entity/employee.entity';
+import { Department } from '../../auth/entity/department.entity';
 
 @Injectable()
 export class TicketService {
@@ -278,6 +281,157 @@ export class TicketService {
   }
 
   /**
+   * Get tickets belonging to manager's department
+   */
+  async getDepartmentTicketsForManager(managerId: string, query: QueryTicketDto) {
+    const manager = await this.findManagerWithDepartmentOrThrow(managerId);
+
+    const page = query.page > 0 ? query.page : 1;
+    const limit = query.limit > 0 ? query.limit : 10;
+    const sortBy = query.sort_by || 'created_at';
+    const sortOrder = query.sort_order || 'DESC';
+
+    const qb = this.ticketRepository
+      .createQueryBuilder('ticket')
+      .leftJoinAndSelect('ticket.employee', 'employee')
+      .leftJoinAndSelect('employee.department', 'employee_department')
+      .leftJoinAndSelect('ticket.assignee', 'assignee')
+      .leftJoinAndSelect('assignee.department', 'assignee_department')
+      .leftJoinAndSelect('ticket.category', 'category')
+      .leftJoinAndSelect('ticket.processes', 'processes')
+      .leftJoinAndSelect('processes.actor', 'process_actor')
+      .leftJoinAndSelect('processes.assignee', 'process_assignee')
+      .where('employee_department.id = :departmentId', {
+        departmentId: manager.department.id,
+      });
+
+    if (query.status) {
+      qb.andWhere('ticket.status = :status', { status: query.status });
+    }
+
+    if (query.category_id) {
+      qb.andWhere('category.id = :category_id', { category_id: query.category_id });
+    }
+
+    if (query.employee_id) {
+      qb.andWhere('employee.id = :employee_id', { employee_id: query.employee_id });
+    }
+
+    if (query.assignee_id) {
+      qb.andWhere('assignee.id = :assignee_id', { assignee_id: query.assignee_id });
+    }
+
+    if (query.keyword) {
+      qb.andWhere('(ticket.title LIKE :keyword OR ticket.description LIKE :keyword)', {
+        keyword: `%${query.keyword}%`,
+      });
+    }
+
+    if (query.from_date) {
+      qb.andWhere('ticket.created_at >= :from_date', {
+        from_date: new Date(query.from_date),
+      });
+    }
+
+    if (query.to_date) {
+      qb.andWhere('ticket.created_at <= :to_date', {
+        to_date: new Date(query.to_date),
+      });
+    }
+
+    qb.orderBy(`ticket.${sortBy}`, sortOrder);
+
+    const [items, total] = await qb
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    const totalPages = Math.ceil(total / limit);
+    return {
+      items: plainToInstance(TicketResponseDto, items, { excludeExtraneousValues: true }),
+      total,
+      page,
+      limit,
+      total_pages: totalPages,
+    };
+  }
+
+  /**
+   * Manager assigns ticket in their department to an employee in the same department
+   */
+  async assignTicketWithinManagerDepartment(
+    managerId: string,
+    ticketId: string,
+    dto: AssignTicketDto,
+  ): Promise<Ticket> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const manager = await this.findManagerWithDepartmentOrThrow(managerId);
+
+      const ticket = await queryRunner.manager.findOne(Ticket, {
+        where: { id: ticketId },
+        relations: ['employee', 'employee.department', 'assignee'],
+      });
+
+      if (!ticket) {
+        throw new NotFoundException(`Ticket with ID ${ticketId} not found`);
+      }
+
+      if (!ticket.employee?.department) {
+        throw new BadRequestException('Ticket creator does not belong to any department');
+      }
+
+      if (ticket.employee.department.id !== manager.department.id) {
+        throw new ForbiddenException('You can only assign tickets in your department');
+      }
+
+      const assignee = await queryRunner.manager.findOne(Employee, {
+        where: { id: dto.assignee_id },
+        relations: ['department'],
+      });
+
+      if (!assignee) {
+        throw new NotFoundException(`Employee with ID ${dto.assignee_id} not found`);
+      }
+
+      if (!assignee.department) {
+        throw new BadRequestException('Assignee is not assigned to any department');
+      }
+
+      if (assignee.department.id !== manager.department.id) {
+        throw new ForbiddenException('You can only assign tickets to employees in your department');
+      }
+
+      ticket.assignee = assignee;
+      ticket.updated_at = new Date();
+
+      const savedTicket = await queryRunner.manager.save(ticket);
+
+      const process = queryRunner.manager.create(TicketProcess, {
+        ticket: savedTicket,
+        actor: manager,
+        assignee,
+        type: TICKET_PROCESS_TYPE.ASSIGNED,
+        note: dto.note,
+        created_at: new Date(),
+      });
+
+      await queryRunner.manager.save(process);
+      await queryRunner.commitTransaction();
+
+      return this.getTicketById(ticketId);
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
    * Update ticket status (creates STATUS_CHANGED process)
    */
   async updateTicketStatus(
@@ -472,6 +626,16 @@ export class TicketService {
 
     if (!employee.department) {
       throw new BadRequestException('Employee is not assigned to any department');
+    }
+
+    return employee;
+  }
+
+  private async findManagerWithDepartmentOrThrow(employeeId: string): Promise<Employee> {
+    const employee = await this.findEmployeeWithDepartmentOrThrow(employeeId);
+
+    if (employee.roles !== ROLE.MANAGER) {
+      throw new ForbiddenException('Only manager can perform this action');
     }
 
     return employee;

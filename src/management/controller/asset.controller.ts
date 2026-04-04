@@ -10,8 +10,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 
-import { Roles } from 'src/auth/roles.decorator';
-import { RolesGuard } from 'src/auth/roles.guard';
+
 import {
   AssignAssetDto,
   CreateAssetDto,
@@ -24,6 +23,8 @@ import {
 } from '../dto';
 import { ASSET_CONDITION, ROLE } from '../entity/constants';
 import { AssetService } from '../service/asset.service';
+import { RolesGuard } from '../../auth/roles.guard';
+import { Roles } from '../../auth/roles.decorator';
 
 @ApiTags('Assets')
 @Controller('assets')

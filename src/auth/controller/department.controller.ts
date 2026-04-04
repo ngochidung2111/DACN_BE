@@ -5,10 +5,12 @@ import { CreateDepartmentDto, DepartmentDto } from "../dto/department.dto";
 import { LoginResponseDto } from "../dto/login.dto";
 import { AuthGuard } from "@nestjs/passport";
 import { Roles } from "../roles.decorator";
-import { ResponseBuilder } from "src/lib/dto/response-builder.dto";
+
 import { RolesGuard } from "../roles.guard";
-import { ROLE } from "src/management/entity/constants";
+
 import { plainToInstance } from "class-transformer";
+import { ResponseBuilder } from "../../lib/dto/response-builder.dto";
+import { ROLE } from "../../management/entity/constants";
 
 @ApiTags('department')
 @ApiBearerAuth()

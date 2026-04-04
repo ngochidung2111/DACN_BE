@@ -8,7 +8,8 @@ import { LoginRequestDto, LoginResponseDto, RefreshTokenRequestDto } from '../dt
 import { SignupRequestDto, SignupResponseDto } from '../dto/signup.dto';
 import { AuthService } from '../service/auth.service';
 import { EmployeeService } from '../service/employee.service';
-import { ResponseBuilder } from 'src/lib/dto/response-builder.dto';
+import { ResponseBuilder } from '../../lib/dto/response-builder.dto';
+
 
 @ApiTags('auth')
 @Controller('auth')

@@ -1,10 +1,11 @@
 import { Controller, Get, Query, Request, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { RolesGuard } from 'src/auth/roles.guard';
+
 import { BookingService } from '../service/booking.service';
 import { LeaveRequestService } from '../service/leave-request.service';
 import { EmployeeScheduleResponseDto } from '../dto';
+import { RolesGuard } from '../../auth/roles.guard';
 
 @ApiTags('Management')
 @Controller('management')

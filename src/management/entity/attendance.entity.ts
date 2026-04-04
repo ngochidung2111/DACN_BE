@@ -1,5 +1,6 @@
-import { Employee } from "src/auth/entity/employee.entity";
+
 import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
+import { Employee } from "../../auth/entity/employee.entity";
 
 @Entity()
 export class Attendance {

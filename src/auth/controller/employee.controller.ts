@@ -1,4 +1,4 @@
-import { ROLE } from 'src/management/entity/constants';
+
 
 import { Body, Controller, Delete, Get, NotFoundException, Param, Post, Request, Res, UseGuards, Query, Patch, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
@@ -13,7 +13,9 @@ import { EmployeeListResponseDto } from '../dto/employee-list-response.dto';
 
 import { plainToInstance } from 'class-transformer';
 import { AdminCreateEmployeeDto, AdminUpdateEmployeeDto, EmployeeDto, UpdateProfileDto } from '../dto/employee.dto';
-import { ResponseBuilder } from 'src/lib/dto/response-builder.dto';
+import { ROLE } from '../../management/entity/constants';
+import { ResponseBuilder } from '../../lib/dto/response-builder.dto';
+
 
 @ApiTags('employee')
 @ApiBearerAuth()

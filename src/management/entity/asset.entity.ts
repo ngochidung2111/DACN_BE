@@ -1,7 +1,8 @@
-import { Employee } from 'src/auth/entity/employee.entity';
+
 import { Check, Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 
 import { ASSET_CONDITION, ASSET_TYPE } from './constants';
+import { Employee } from '../../auth/entity/employee.entity';
 
 @Entity()
 @Check("(`type` = 'PRIVATE' AND `location` IS NULL) OR (`type` = 'PUBLIC' AND `owner_employee_id` IS NULL AND `location` IS NOT NULL)")
