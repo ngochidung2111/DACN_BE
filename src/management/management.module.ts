@@ -10,6 +10,7 @@ import { LeaveRequestController } from './controller/leave-request.controller';
 import { AssetController } from './controller/asset.controller';
 import { TicketController } from './controller/ticket.controller';
 import { ReportController } from './controller/report.controller';
+import { AnnouncementController } from './controller/announcement.controller';
 import { ManagementService } from './service/management.service';
 import { BookingService } from './service/booking.service';
 import { RoomService } from './service/room.service';
@@ -19,12 +20,15 @@ import { LeaveRequestService } from './service/leave-request.service';
 import { AssetService } from './service/asset.service';
 import { TicketService } from './service/ticket.service';
 import { ReportService } from './service/report.service';
+import { AnnouncementService } from './service/announcement.service';
 import { RoomStatusScheduler } from './service/room-status.scheduler';
 import { Booking } from './entity/booking.entity';
 import { Room } from './entity/room.entity';
 import { Attendance } from './entity/attendance.entity';
 import { Payroll } from './entity/payroll.entity';
 import { LeaveRequest } from './entity/leave-request.entity';
+import { CompanyAnnouncement } from './entity/company-announcement.entity';
+import { AnnouncementInteraction } from './entity/announcement-interaction.entity';
 import { Asset } from './entity/asset.entity';
 import { AssetAssignment } from './entity/asset-assignment.entity';
 import { Ticket } from './entity/ticket.entity';
@@ -44,6 +48,8 @@ import { Department } from '../auth/entity/department.entity';
       Attendance,
       Payroll,
       LeaveRequest,
+      CompanyAnnouncement,
+      AnnouncementInteraction,
       Asset,
       AssetAssignment,
       Ticket,
@@ -59,6 +65,7 @@ import { Department } from '../auth/entity/department.entity';
   ],
   controllers: [
     ManagementController,
+    AnnouncementController,
     BookingController,
     RoomController,
     AttendanceController,
@@ -71,6 +78,7 @@ import { Department } from '../auth/entity/department.entity';
   ],
   providers: [
     ManagementService,
+    AnnouncementService,
     BookingService,
     RoomService,
     AttendanceService,

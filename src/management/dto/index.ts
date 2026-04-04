@@ -21,3 +21,9 @@ export * from './payroll';
 
 // Report DTOs
 export * from './report';
+
+// Schedule DTOs
+export * from './schedule/employee-schedule-item.dto';
+
+// Announcement DTOs
+export * from './announcement';

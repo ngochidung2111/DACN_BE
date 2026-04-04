@@ -1,4 +1,4 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 
 import { Employee } from '../../auth/entity/employee.entity';
 import { CompanyAnnouncement } from './company-announcement.entity';
@@ -9,17 +9,22 @@ export class AnnouncementInteraction {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => CompanyAnnouncement)
+  @ManyToOne(() => CompanyAnnouncement, (announcement) => announcement.interactions, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'announcement_id' })
   announcement: CompanyAnnouncement;
 
-  @ManyToOne(() => Employee)
+  @ManyToOne(() => Employee, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'employee_id' })
   employee: Employee;
 
-  @Column()
+  @Column({ type: 'enum', enum: INTERACTION_TYPE })
   interaction_type: INTERACTION_TYPE;
 
   @Column('text', { nullable: true })
-  comment: string;
+  comment?: string | null;
+
+  @CreateDateColumn()
+  created_at: Date;
 }
