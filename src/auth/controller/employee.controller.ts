@@ -205,7 +205,6 @@ export class EmployeeController {
   //   });
   // }
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(ROLE.ADMIN, ROLE.MANAGER)
   @Get('department')
   async getEmployeesByManger(@Request() req) {
     
