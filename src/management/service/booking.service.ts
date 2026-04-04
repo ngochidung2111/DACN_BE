@@ -6,10 +6,11 @@ import { Room } from '../entity/room.entity';
 import { BookingResponseDto, CreateBookingDto, UpdateBookingDto } from '../dto/booking';
 import { BOOKING_STATUS, BOOKING_PATTERN } from '../entity/constants';
 import { plainToInstance } from 'class-transformer';
-import { EmployeeService } from 'src/auth/service/employee.service';
-import { Employee } from 'src/auth/entity/employee.entity';
+
 import { BookingResponseShortDto } from '../dto/booking';
 import { EMPLOYEE_SCHEDULE_ITEM_TYPE, EmployeeScheduleItemDto } from '../dto';
+import { EmployeeService } from '../../auth/service/employee.service';
+import { Employee } from '../../auth/entity/employee.entity';
 
 @Injectable()
 export class BookingService {

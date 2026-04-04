@@ -1,4 +1,4 @@
-import { Employee } from 'src/auth/entity/employee.entity';
+
 import {
   Column,
   CreateDateColumn,
@@ -9,6 +9,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { Employee } from '../../auth/entity/employee.entity';
 
 export enum PAYROLL_STATUS {
   DRAFT = 'DRAFT',

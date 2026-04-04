@@ -2,12 +2,13 @@ import { Controller, Get, Post, Put, Delete, Body, Param, Query, UploadedFile, U
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { RoomService } from '../service/room.service';
 import { CreateRoomDto, UpdateRoomDto, RoomResponseDto } from '../dto';
-import { RolesGuard } from 'src/auth/roles.guard';
-import { Roles } from 'src/auth/roles.decorator';
+
 import { AuthGuard } from '@nestjs/passport';
 import { ROLE } from '../entity/constants';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiConsumes } from '@nestjs/swagger';
+import { RolesGuard } from '../../auth/roles.guard';
+import { Roles } from '../../auth/roles.decorator';
 
 @ApiTags('Rooms')
 @Controller('rooms')

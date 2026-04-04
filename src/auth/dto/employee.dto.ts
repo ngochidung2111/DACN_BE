@@ -1,10 +1,11 @@
-import { ROLE } from "src/management/entity/constants";
+
 import { Department } from "../entity/department.entity";
 import { ApiProperty } from "@nestjs/swagger";
 import { Expose, Type } from "class-transformer";
 import { IsBoolean, IsDate, IsEmail, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, MinLength } from "class-validator";
 import { GENDER } from "../entity/constant";
 import { DepartmentDto } from "./department.dto";
+import { ROLE } from "../../management/entity/constants";
 
 export class DegreeDto {
     @ApiProperty({ description: 'Degree ID', example: 'uuid-123' })

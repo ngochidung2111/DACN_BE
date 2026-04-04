@@ -2,8 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { InjectRepository } from '@nestjs/typeorm';
 import { plainToInstance } from 'class-transformer';
 import { Repository } from 'typeorm';
-import { EmployeeService } from 'src/auth/service/employee.service';
-import { Employee } from 'src/auth/entity/employee.entity';
+
 import { AnnouncementInteraction, CompanyAnnouncement } from '../entity';
 import { ANNOUNCEMENT_CATEGORY, INTERACTION_TYPE, ROLE } from '../entity/constants';
 import { GcsService } from './gcs.service';
@@ -17,6 +16,13 @@ import {
   CreateAnnouncementDto,
   UpdateAnnouncementDto,
 } from '../dto/announcement';
+import { EmployeeService } from '../../auth/service/employee.service';
+
+type UploadedAnnouncementImage = {
+  originalname: string;
+  buffer: Buffer;
+  mimetype?: string;
+};
 
 @Injectable()
 export class AnnouncementService {
@@ -29,7 +35,7 @@ export class AnnouncementService {
     private readonly gcsService: GcsService,
   ) {}
 
-  async uploadAnnouncementImage(announcementId: string, employeeId: string, file: Express.Multer.File) {
+  async uploadAnnouncementImage(announcementId: string, employeeId: string, file: UploadedAnnouncementImage) {
     const employee = await this.employeeService.findById(employeeId);
 
     if (![ROLE.ADMIN, ROLE.MANAGER].includes(employee.roles)) {

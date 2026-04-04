@@ -1,12 +1,13 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Roles } from 'src/auth/roles.decorator';
-import { RolesGuard } from 'src/auth/roles.guard';
-import { ResponseBuilder } from 'src/lib/dto/response-builder.dto';
+
 import { CreateLeaveRequestDto, ProcessLeaveRequestDto, QueryLeaveRequestDto, UpdateLeaveRequestDto } from '../dto';
 import { ROLE } from '../entity/constants';
 import { LeaveRequestService } from '../service/leave-request.service';
+import { RolesGuard } from '../../auth/roles.guard';
+import { Roles } from '../../auth/roles.decorator';
+import { ResponseBuilder } from '../../lib/dto/response-builder.dto';
 
 @ApiTags('Leave Requests')
 @Controller('leave-requests')

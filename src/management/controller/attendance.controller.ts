@@ -1,13 +1,15 @@
 import { Controller, Post, UseGuards, Request, Get, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
-import { RolesGuard } from 'src/auth/roles.guard';
+
 import { AttendanceService } from '../service/attendance.service';
-import { ResponseBuilder } from 'src/lib/dto/response-builder.dto';
+
 import { AttendanceDto } from '../dto/attendance';
 import { plainToInstance } from 'class-transformer';
 import { QueryAttendanceDto } from '../dto/attendance';
 import { MonthlyAttendanceSummaryQueryDto } from '../dto/attendance';
+import { RolesGuard } from '../../auth/roles.guard';
+import { ResponseBuilder } from '../../lib/dto/response-builder.dto';
 
 @ApiTags('Attendance')
 @Controller('attendance')

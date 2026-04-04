@@ -21,8 +21,7 @@ import {
 } from '@nestjs/swagger';
 import { plainToInstance } from 'class-transformer';
 
-import { RolesGuard } from 'src/auth/roles.guard';
-import { ResponseBuilder } from 'src/lib/dto/response-builder.dto';
+import { ROLE } from '../entity/constants';
 import {
   AssignDepartmentTicketCategoriesDto,
   AssignTicketDto,
@@ -41,6 +40,9 @@ import {
 } from '../dto';
 import { Ticket } from '../entity/ticket.entity';
 import { TicketService } from '../service/ticket.service';
+import { RolesGuard } from '../../auth/roles.guard';
+import { Roles } from '../../auth/roles.decorator';
+import { ResponseBuilder } from '../../lib/dto/response-builder.dto';
 
 @Controller('management/tickets')
 @ApiTags('Tickets')
@@ -60,6 +62,7 @@ export class TicketController {
     description: 'Ticket category created successfully',
     type: TicketCategoryResponseDto,
   })
+  @Roles(ROLE.ADMIN, ROLE.MANAGER)
   async createCategory(@Body() dto: CreateTicketCategoryDto) {
     const category = await this.ticketService.createTicketCategory(dto);
     return ResponseBuilder.createResponse({
@@ -79,6 +82,7 @@ export class TicketController {
     description: 'Ticket categories retrieved successfully',
     type: [TicketCategoryResponseDto],
   })
+  @Roles(ROLE.ADMIN, ROLE.MANAGER)
   async getCategories(@Query() query: QueryTicketCategoryDto) {
     const categories = await this.ticketService.getTicketCategories(query);
     return ResponseBuilder.createResponse({
@@ -110,6 +114,7 @@ export class TicketController {
   /**
    * Set ticket categories managed by a department
    */
+  @Roles(ROLE.ADMIN, ROLE.MANAGER)
   @Patch('departments/:departmentId/categories')
   @ApiOperation({ summary: 'Assign ticket categories to a department' })
   @ApiBody({ type: AssignDepartmentTicketCategoriesDto })
@@ -164,6 +169,7 @@ export class TicketController {
     description: 'Tickets retrieved successfully',
     type: TicketListResponseDto,
   })
+  @Roles(ROLE.ADMIN, ROLE.MANAGER)
   async list(@Query() query: QueryTicketDto) {
     const result = await this.ticketService.getTickets(query);
     const data = plainToInstance(TicketListResponseDto, result, {
@@ -234,6 +240,70 @@ export class TicketController {
   }
 
   /**
+   * Get tickets of manager's department
+   */
+  @Roles(ROLE.ADMIN, ROLE.MANAGER)
+  @Get('manager/department')
+  @Roles(ROLE.MANAGER)
+  @ApiOperation({ summary: 'Manager gets tickets belonging to their department' })
+  @ApiQuery({ type: QueryTicketDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Department tickets retrieved successfully',
+    type: TicketListResponseDto,
+  })
+  async getDepartmentTicketsForManager(
+    @Query() query: QueryTicketDto,
+    @Req() req: any,
+  ) {
+    const managerId = req.user.userId;
+    const result = await this.ticketService.getDepartmentTicketsForManager(managerId, query);
+    const data = plainToInstance(TicketListResponseDto, result, {
+      excludeExtraneousValues: true,
+    });
+
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'Department tickets retrieved successfully',
+      data,
+    });
+  }
+
+  /**
+   * Assign ticket to an employee in manager's department
+   */
+  @Patch('manager/:id/assign')
+  @Roles(ROLE.MANAGER)
+  @ApiOperation({
+    summary:
+      'Manager assigns a department ticket to an employee in the same department',
+  })
+  @ApiBody({ type: AssignTicketDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Department ticket assigned successfully',
+    type: TicketResponseDto,
+  })
+  async assignDepartmentTicket(
+    @Param('id') id: string,
+    @Body() dto: AssignTicketDto,
+    @Req() req: any,
+  ) {
+    const managerId = req.user.userId;
+    const ticket = await this.ticketService.assignTicketWithinManagerDepartment(
+      managerId,
+      id,
+      dto,
+    );
+
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'Department ticket assigned successfully',
+      data: ticket,
+    });
+  }
+
+  /**
    * Get ticket statistics
    */
   @Get('stats')
@@ -242,6 +312,7 @@ export class TicketController {
     status: 200,
     description: 'Statistics retrieved successfully',
   })
+  @Roles(ROLE.ADMIN, ROLE.MANAGER)
   async getStats() {
     const stats = await this.ticketService.getTicketStats();
     return ResponseBuilder.createResponse({

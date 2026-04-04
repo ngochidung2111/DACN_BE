@@ -2,7 +2,6 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 
-import { Employee } from 'src/auth/entity/employee.entity';
 import {
   AssignAssetDto,
   CreateAssetDto,
@@ -16,6 +15,7 @@ import {
 import { AssetAssignment } from '../entity/asset-assignment.entity';
 import { Asset } from '../entity/asset.entity';
 import { ASSET_TYPE } from '../entity/constants';
+import { Employee } from '../../auth/entity/employee.entity';
 
 @Injectable()
 export class AssetService {

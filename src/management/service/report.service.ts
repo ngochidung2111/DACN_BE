@@ -7,7 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { plainToInstance } from 'class-transformer';
 
-import { Employee } from 'src/auth/entity/employee.entity';
+
 import {
   CreateReportDto,
   UpdateReportDto,
@@ -17,6 +17,7 @@ import {
 } from '../dto';
 import { Report } from '../entity/report.entity';
 import { REPORT_STATUS } from '../entity/constants';
+import { Employee } from '../../auth/entity/employee.entity';
 
 @Injectable()
 export class ReportService {

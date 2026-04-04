@@ -1,10 +1,11 @@
 import { Body, Controller, Post, Request, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { RolesGuard } from 'src/auth/roles.guard';
-import { ResponseBuilder } from 'src/lib/dto/response-builder.dto';
+
 import { PayrollMonthDto } from '../dto/payroll';
 import { PayrollService } from '../service/payroll.service';
+import { RolesGuard } from '../../auth/roles.guard';
+import { ResponseBuilder } from '../../lib/dto/response-builder.dto';
 
 @ApiTags('Payroll')
 @Controller('payroll')
