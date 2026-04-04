@@ -19,7 +19,6 @@
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
-    "strictPropertyInitialization": false,
-    "types": ["node", "Multer"]  
+    "strictPropertyInitialization": false
   }
 }
