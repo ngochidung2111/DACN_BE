@@ -3,14 +3,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, MoreThanOrEqual } from 'typeorm';
 import { Room } from '../entity/room.entity';
 import { CreateRoomDto, UpdateRoomDto } from '../dto';
-import { GcsService } from './gcs.service';
+import { S3Service } from './s3.service';
 
 @Injectable()
 export class RoomService {
   constructor(
     @InjectRepository(Room)
     private roomRepository: Repository<Room>,
-    private readonly gcsService: GcsService,
+    private readonly s3Service: S3Service,
   ) {}
 
   // Tạo phòng mới
@@ -131,7 +131,7 @@ export class RoomService {
     const safeFileName = file.originalname.replace(/\s+/g, '-');
     const key = `rooms/${room.id}/${Date.now()}-${safeFileName}`;
 
-    const uploaded = await this.gcsService.uploadFile({
+    const uploaded = await this.s3Service.uploadFile({
       key,
       file: file.buffer,
       contentType: file.mimetype || 'application/octet-stream',
@@ -155,7 +155,7 @@ export class RoomService {
       throw new NotFoundException('Room does not have an image');
     }
 
-    const readUrl = await this.gcsService.createReadUrl(room.imageKey);
+    const readUrl = await this.s3Service.createReadUrl(room.imageKey);
 
     return {
       roomId: room.id,

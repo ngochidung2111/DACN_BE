@@ -77,6 +77,7 @@ async function bootstrap() {
     console.error('Error creating default admin:', err?.message ?? err);
   }
 
+  
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();

@@ -625,7 +625,7 @@ export class TicketService {
     }
 
     if (!employee.department) {
-      throw new BadRequestException('Employee is not assigned to any department');
+      throw new BadRequestException('Employee is not assigned to any department1');
     }
 
     return employee;

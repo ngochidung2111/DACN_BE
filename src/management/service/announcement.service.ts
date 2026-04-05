@@ -5,7 +5,7 @@ import { Repository } from 'typeorm';
 
 import { AnnouncementInteraction, CompanyAnnouncement } from '../entity';
 import { ANNOUNCEMENT_CATEGORY, INTERACTION_TYPE, ROLE } from '../entity/constants';
-import { GcsService } from './gcs.service';
+import { S3Service } from './s3.service';
 import {
   AnnouncementCommentResponseDto,
   AnnouncementListResponseDto,
@@ -32,7 +32,7 @@ export class AnnouncementService {
     @InjectRepository(AnnouncementInteraction)
     private readonly interactionRepository: Repository<AnnouncementInteraction>,
     private readonly employeeService: EmployeeService,
-    private readonly gcsService: GcsService,
+    private readonly s3Service: S3Service,
   ) {}
 
   async uploadAnnouncementImage(announcementId: string, employeeId: string, file: UploadedAnnouncementImage) {
@@ -51,7 +51,7 @@ export class AnnouncementService {
     const safeFileName = file.originalname.replace(/\s+/g, '-');
     const key = `announcements/${announcement.id}/${Date.now()}-${safeFileName}`;
 
-    const uploaded = await this.gcsService.uploadFile({
+    const uploaded = await this.s3Service.uploadFile({
       key,
       file: file.buffer,
       contentType: file.mimetype || 'application/octet-stream',

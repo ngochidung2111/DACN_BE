@@ -9,7 +9,7 @@ import { Employee } from '../entity/employee.entity';
 import { Degree } from '../entity/degree.entity';
 import { DepartmentService } from './department.service';
 import { AdminCreateEmployeeDto, AdminUpdateEmployeeDto, UpdateProfileDto, DegreeInputDto } from '../dto/employee.dto';
-import { GcsService } from '../../management/service/gcs.service';
+import { S3Service } from '../../management/service/s3.service';
 
 @Injectable()
 export class EmployeeService {
@@ -19,7 +19,7 @@ export class EmployeeService {
     @InjectRepository(Degree)
     private readonly degreeRepository: Repository<Degree>,
     private readonly departmentService: DepartmentService,
-    private readonly gcsService: GcsService,
+    private readonly s3Service: S3Service,
   ) {}
   async findOneById(id: string): Promise<Employee> {
     const result = await this.employeeRepository.findOne({ where: { id }, relations: ['department', 'degrees'] });
@@ -193,7 +193,7 @@ export class EmployeeService {
     const safeFileName = file.originalname.replace(/\s+/g, '-');
     const key = `employees/${employee.id}/avatar/${Date.now()}-${safeFileName}`;
 
-    const uploaded = await this.gcsService.uploadFile({
+    const uploaded = await this.s3Service.uploadFile({
       key,
       file: file.buffer,
       contentType: file.mimetype || 'application/octet-stream',
