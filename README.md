@@ -70,6 +70,39 @@ $ mau deploy
 
 With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
 
+## AWS S3 Setup
+
+The application now uses AWS S3 for file uploads and signed URLs.
+
+Required environment variables:
+
+- `S3_ACCESS_KEY_ID`
+- `S3_SECRET_ACCESS_KEY`
+- `S3_SESSION_TOKEN` if you use temporary credentials
+- `S3_REGION`
+- `S3_BUCKET`
+- `S3_ENDPOINT` for custom S3-compatible storage
+- `S3_FORCE_PATH_STYLE` for MinIO and similar providers
+- `S3_PRESIGN_EXPIRES`
+- `S3_PUBLIC_BASE_URL` if your bucket uses a custom public URL
+
+The IAM user or role behind these credentials must allow at least the following actions on the bucket:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:ListBucket"],
+      "Resource": ["arn:aws:s3:::YOUR_BUCKET_NAME", "arn:aws:s3:::YOUR_BUCKET_NAME/*"]
+    }
+  ]
+}
+```
+
+If you see `AccessDenied` during upload, the credentials are valid but the IAM policy is too restrictive. Add the bucket permissions above or attach the appropriate managed policy to the user/role.
+
 ## Resources
 
 Check out a few resources that may come in handy when working with NestJS:

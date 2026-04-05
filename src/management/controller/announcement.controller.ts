@@ -83,7 +83,7 @@ export class AnnouncementController {
     return ResponseBuilder.createResponse({ statusCode: 201, message: 'Announcement created successfully', data });
   }
 
-  @ApiOperation({ summary: 'Upload announcement image to GCS bucket' })
+  @ApiOperation({ summary: 'Upload announcement image to S3 bucket' })
   @ApiParam({ name: 'id', description: 'Announcement ID' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({

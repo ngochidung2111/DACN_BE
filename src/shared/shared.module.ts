@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { GcsService } from '../management/service/gcs.service';
+import { S3Service } from '../management/service/s3.service';
 
 @Module({
-  providers: [GcsService],
-  exports: [GcsService],
+  providers: [S3Service],
+  exports: [S3Service],
 })
 export class SharedModule {}
