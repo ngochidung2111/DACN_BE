@@ -5,6 +5,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
+import { AiModule } from './ai/ai.module';
+import aiConfig from './config/ai.config';
 import authConfig from './config/auth.config';
 import authLocalConfig from './config/auth.local.config';
 import defaultConfig from './config/default.config';
@@ -16,7 +18,7 @@ import { ManagementModule } from './management/management.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [defaultConfig, localConfig, authConfig, authLocalConfig, s3Config],
+      load: [defaultConfig, localConfig, authConfig, authLocalConfig, s3Config, aiConfig],
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -27,6 +29,7 @@ import { ManagementModule } from './management/management.module';
     }),
     ManagementModule,
     AuthModule,
+    AiModule,
   ],
   controllers: [AppController],
   providers: [AppService],

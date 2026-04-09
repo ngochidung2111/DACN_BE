@@ -246,7 +246,6 @@ export class TicketController {
   @Get('manager/department')
   @Roles(ROLE.MANAGER)
   @ApiOperation({ summary: 'Manager gets tickets belonging to their department' })
-  @ApiQuery({ type: QueryTicketDto })
   @ApiResponse({
     status: 200,
     description: 'Department tickets retrieved successfully',
