@@ -1,6 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Transform } from 'class-transformer';
 import { REPORT_STATUS } from '../../entity/constants';
+import { EmployeeMinimalDto } from '../ticket';
+
 
 export class ReportResponseDto {
   @Expose()
@@ -43,6 +45,20 @@ export class ReportResponseDto {
     required: false,
   })
   blocker: string;
+
+  @Expose()  
+  @Transform(({ obj }) => {
+    if (obj.employee) {
+      return {
+        id: obj.employee.id,
+        firstName: obj.employee.firstName,
+        middleName: obj.employee.middleName,
+        lastName: obj.employee.lastName,
+        email: obj.employee.email,
+      };
+    }
+  })
+  employee: EmployeeMinimalDto;
 
   @Expose()
   @ApiProperty({

@@ -69,7 +69,7 @@ export class EmployeeService {
   async create(employeeData: SignupRequestDto): Promise<Employee> {
     let department;
     if (employeeData.department) {
-      const department = await this.departmentService.findByName(employeeData.department);
+      department = await this.departmentService.findByName(employeeData.department);
     }
     if (await this.checkEmail(employeeData.email)) {
       throw new UnauthorizedException('Email already in use');
