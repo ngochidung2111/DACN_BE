@@ -89,5 +89,12 @@ import { Department } from '../auth/entity/department.entity';
     ReportService,
     RoomStatusScheduler,
   ],
+  exports: [
+    BookingService,
+    RoomService,
+    AttendanceService,
+    LeaveRequestService,
+    AnnouncementService,
+  ],
 })
 export class ManagementModule {}

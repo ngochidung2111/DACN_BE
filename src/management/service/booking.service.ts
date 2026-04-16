@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
+import { Repository, Between, In, Like, MoreThanOrEqual } from 'typeorm';
 import { Booking } from '../entity/booking.entity';
 import { Room } from '../entity/room.entity';
 import { BookingResponseDto, CreateBookingDto, UpdateBookingDto } from '../dto/booking';
@@ -416,6 +416,99 @@ export class BookingService {
       relations: ['room', 'employee', 'attendees'],
     });
     return this.mapToBookingResponseShort(bookings);
+  }
+
+  async findRoomByNameForBooking(roomName: string): Promise<Room> {
+    const normalized = roomName.trim().toLowerCase();
+    if (!normalized) {
+      throw new BadRequestException('Room name is required');
+    }
+
+    const rooms = await this.roomRepository.find({
+      where: {
+        name: Like(`%${roomName.trim()}%`),
+      },
+      order: { name: 'ASC' },
+    });
+
+    if (rooms.length === 0) {
+      throw new NotFoundException(`Room with name "${roomName}" not found`);
+    }
+
+    const exact = rooms.find((room) => room.name.trim().toLowerCase() === normalized);
+    return exact ?? rooms[0];
+  }
+
+  async getMeetingRoomSchedule(
+    startTime: Date,
+    endTime: Date,
+    roomId?: string,
+    minCapacity?: number,
+  ) {
+    if (startTime >= endTime) {
+      throw new BadRequestException('Start time must be before end time');
+    }
+
+    const roomWhere: Record<string, unknown> = {};
+    if (roomId) {
+      roomWhere.id = roomId;
+    }
+    if (minCapacity !== undefined) {
+      roomWhere.capacity = MoreThanOrEqual(minCapacity);
+    }
+
+    const rooms = await this.roomRepository.find({
+      where: roomWhere,
+      order: { name: 'ASC' },
+    });
+
+    if (roomId && rooms.length === 0) {
+      throw new NotFoundException('Room not found');
+    }
+
+    if (rooms.length === 0) {
+      return [];
+    }
+
+    const roomIds = rooms.map((room) => room.id);
+    const bookings = await this.bookingRepository.find({
+      where: {
+        room: { id: In(roomIds) },
+      },
+      relations: ['room', 'employee', 'attendees'],
+      order: { start_time: 'ASC' },
+    });
+
+    const activeOverlaps = bookings.filter(
+      (booking) =>
+        booking.status !== BOOKING_STATUS.CANCELLED &&
+        booking.start_time < endTime &&
+        booking.end_time > startTime,
+    );
+
+    const bookingMap = new Map<string, Booking[]>();
+    for (const booking of activeOverlaps) {
+      const key = booking.room?.id;
+      if (!key) {
+        continue;
+      }
+
+      const existed = bookingMap.get(key) ?? [];
+      existed.push(booking);
+      bookingMap.set(key, existed);
+    }
+
+    return rooms.map((room) => {
+      const conflicts = bookingMap.get(room.id) ?? [];
+      return {
+        room,
+        available: conflicts.length === 0,
+        conflictCount: conflicts.length,
+        conflicts: plainToInstance(BookingResponseDto, conflicts, {
+          excludeExtraneousValues: true,
+        }),
+      };
+    });
   }
 
   async findByCreatorOrAttendee(employeeId: string): Promise<BookingResponseDto[]> {

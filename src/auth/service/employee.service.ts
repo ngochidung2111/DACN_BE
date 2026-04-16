@@ -159,6 +159,14 @@ export class EmployeeService {
     }
     return await this.employeeRepository.find({ where: { department: { id: department.id } }, relations: ['department'] });
   }
+
+  async findByDepartmentId(departmentId: string): Promise<Employee[]> {
+    return await this.employeeRepository.find({
+      where: { department: { id: departmentId } },
+      relations: ['department', 'degrees'],
+      order: { firstName: 'ASC', middleName: 'ASC', lastName: 'ASC' },
+    });
+  }
   async findById(id: string): Promise<Employee> {
     const employee = await this.employeeRepository.findOne({ where: { id }, relations: ['department', 'degrees'] });
     if (!employee) {

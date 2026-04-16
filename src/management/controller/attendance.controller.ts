@@ -4,12 +4,14 @@ import { AuthGuard } from '@nestjs/passport';
 
 import { AttendanceService } from '../service/attendance.service';
 
-import { AttendanceDto } from '../dto/attendance';
+import { AttendanceDto, DepartmentAttendanceSummaryResponseDto } from '../dto/attendance';
 import { plainToInstance } from 'class-transformer';
 import { QueryAttendanceDto } from '../dto/attendance';
 import { MonthlyAttendanceSummaryQueryDto } from '../dto/attendance';
 import { RolesGuard } from '../../auth/roles.guard';
+import { Roles } from '../../auth/roles.decorator';
 import { ResponseBuilder } from '../../lib/dto/response-builder.dto';
+import { ROLE } from '../entity/constants';
 
 @ApiTags('Attendance')
 @Controller('attendance')
@@ -96,6 +98,30 @@ export class AttendanceController {
       statusCode: 200,
       message: 'Monthly attendance summary retrieved successfully',
       data: await this.attendanceService.getMonthlyAttendanceSummary(
+        req.user.userId,
+        query.year,
+        query.month,
+      ),
+    });
+  }
+
+  @ApiOperation({ summary: "Get attendance summary by department for manager" })
+  @ApiQuery({ name: 'year', required: true, example: 2026 })
+  @ApiQuery({ name: 'month', required: true, example: 4 })
+  @ApiResponse({ status: 200, description: 'Department attendance summary retrieved successfully', type: DepartmentAttendanceSummaryResponseDto })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(ROLE.MANAGER, ROLE.ADMIN)
+  @Get('department/monthly-summary')
+  async getDepartmentMonthlyAttendanceSummary(
+    @Request() req,
+    @Query() query: MonthlyAttendanceSummaryQueryDto,
+  ) {
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'Department attendance summary retrieved successfully',
+      data: await this.attendanceService.getDepartmentMonthlyAttendanceSummary(
         req.user.userId,
         query.year,
         query.month,
