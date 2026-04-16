@@ -8,14 +8,19 @@ const parseBool = (value?: string) => {
   return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
 };
 
+const parseNumber = (value: string | undefined, fallback: number) => {
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
 export default registerAs('ai', () => ({
-  bedrockRegion:
-    process.env.AI_BEDROCK_REGION?.trim() || process.env.AWS_REGION?.trim() || process.env.S3_REGION?.trim() || 'ap-southeast-2',
-  bedrockAgentId: process.env.AI_BEDROCK_AGENT_ID?.trim() || '',
-  bedrockAgentAliasId: process.env.AI_BEDROCK_AGENT_ALIAS_ID?.trim() || '',
-  bedrockEnableTrace: parseBool(process.env.AI_BEDROCK_ENABLE_TRACE),
-  bedrockAccessKeyId: process.env.AI_BEDROCK_ACCESS_KEY_ID?.trim() || process.env.AWS_ACCESS_KEY_ID?.trim(),
-  bedrockSecretAccessKey:
-    process.env.AI_BEDROCK_SECRET_ACCESS_KEY?.trim() || process.env.AWS_SECRET_ACCESS_KEY?.trim(),
-  bedrockSessionToken: process.env.AI_BEDROCK_SESSION_TOKEN?.trim() || process.env.AWS_SESSION_TOKEN?.trim(),
+  geminiApiKey: process.env.AI_GEMINI_API_KEY?.trim() || process.env.GOOGLE_API_KEY?.trim() || '',
+  geminiModel: process.env.AI_GEMINI_MODEL?.trim() || '	gemini-2.5-flash-lite',
+  geminiTemperature: parseNumber(process.env.AI_GEMINI_TEMPERATURE, 0.3),
+  geminiMaxOutputTokens: parseNumber(process.env.AI_GEMINI_MAX_OUTPUT_TOKENS, 1024),
+  langchainVerbose: parseBool(process.env.AI_LANGCHAIN_VERBOSE),
 }));
