@@ -1,17 +1,25 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request, Inject } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { BookingService } from '../service/booking.service';
 import { AddBookingAttendeesDto, CreateBookingDto, UpdateBookingDto, BookingResponseDto } from '../dto';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../../auth/roles.guard';
 import { ResponseBuilder } from '../../lib/dto/response-builder.dto';
+import { Cache } from 'cache-manager';
 
 
 @ApiTags('Bookings')
 @Controller('bookings')
 @ApiBearerAuth()
 export class BookingController {
-  constructor(private readonly bookingService: BookingService) {}
+  private readonly cacheVersionKey = 'booking:cache:version';
+  private readonly cacheTtl = 60_000;
+
+  constructor(
+    private readonly bookingService: BookingService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+  ) {}
 
   // Tạo booking mới
   @ApiOperation({ summary: 'Tạo đặt phòng mới' })
@@ -31,6 +39,7 @@ export class BookingController {
     @Request() req,
   ) {
     const booking = await this.bookingService.createBooking(req.user.userId, createBookingDto);
+    await this.bumpCacheVersion();
     return {
       success: true,
       message: 'Booking created successfully',
@@ -57,17 +66,20 @@ export class BookingController {
     @Query('attendeeId') attendeeId?: string,
     @Query('status') status?: string,
   ) {
-    const bookings = await this.bookingService.getAllBookings(
-      roomId,
-      employeeId,
-      status as any,
-      attendeeId,
-    );
-    return {
-      success: true,
-      data: bookings,
-      total: bookings.length,
-    };
+    const key = this.serializeQuery({ roomId, employeeId, attendeeId, status });
+    return this.getOrSetCache('all', key, async () => {
+      const bookings = await this.bookingService.getAllBookings(
+        roomId,
+        employeeId,
+        status as any,
+        attendeeId,
+      );
+      return {
+        success: true,
+        data: bookings,
+        total: bookings.length,
+      };
+    });
   }
 
   // Lấy lịch sử booking của employee (đặt trước route :id để tránh xung đột)
@@ -81,12 +93,14 @@ export class BookingController {
   @Get('employee')
   async getEmployeeBookingHistory(@Request() req) {
     const employeeId = req.user.userId;
-    const bookings = await this.bookingService.getEmployeeBookingHistory(employeeId);
-    return {
-      success: true,
-      data: bookings,
-      total: bookings.length,
-    };
+    return this.getOrSetCache('employee-history', String(employeeId), async () => {
+      const bookings = await this.bookingService.getEmployeeBookingHistory(employeeId);
+      return {
+        success: true,
+        data: bookings,
+        total: bookings.length,
+      };
+    });
   }
   @ApiOperation({ summary: 'Lấy bookings theo nhân viên' })
   @ApiResponse({
@@ -98,11 +112,13 @@ export class BookingController {
   @Get('by-employee')
   async findByEmployee(@Request() req) {
     const employeeId = req.user.userId;
-    const bookings = await this.bookingService.findByEmployee(employeeId);
-    return ResponseBuilder.createResponse({
-      statusCode: 200,
-      message: 'Bookings retrieved successfully',
-      data: bookings,
+    return this.getOrSetCache('by-employee', String(employeeId), async () => {
+      const bookings = await this.bookingService.findByEmployee(employeeId);
+      return ResponseBuilder.createResponse({
+        statusCode: 200,
+        message: 'Bookings retrieved successfully',
+        data: bookings,
+      });
     });
   }
 
@@ -116,12 +132,14 @@ export class BookingController {
   @Get('involved/me')
   async getInvolvedBookings(@Request() req) {
     const employeeId = req.user.userId;
-    const bookings = await this.bookingService.findByCreatorOrAttendee(employeeId);
-    return {
-      success: true,
-      data: bookings,
-      total: bookings.length,
-    };
+    return this.getOrSetCache('involved-me', String(employeeId), async () => {
+      const bookings = await this.bookingService.findByCreatorOrAttendee(employeeId);
+      return {
+        success: true,
+        data: bookings,
+        total: bookings.length,
+      };
+    });
   }
 
   // Lấy booking theo ID
@@ -136,11 +154,13 @@ export class BookingController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get(':id')
   async getBookingById(@Param('id') bookingId: string) {
-    const booking = await this.bookingService.getBookingById(bookingId);
-    return {
-      success: true,
-      data: booking,
-    };
+    return this.getOrSetCache('by-id', bookingId, async () => {
+      const booking = await this.bookingService.getBookingById(bookingId);
+      return {
+        success: true,
+        data: booking,
+      };
+    });
   }
 
   // Cập nhật booking
@@ -160,6 +180,7 @@ export class BookingController {
     @Body() updateBookingDto: UpdateBookingDto,
   ) {
     const booking = await this.bookingService.updateBooking(bookingId, updateBookingDto);
+    await this.bumpCacheVersion();
     return {
       success: true,
       message: 'Booking updated successfully',
@@ -182,6 +203,7 @@ export class BookingController {
     @Body() body: AddBookingAttendeesDto,
   ) {
     const booking = await this.bookingService.addAttendees(bookingId, body.attendee_ids);
+    await this.bumpCacheVersion();
     return {
       success: true,
       message: 'Attendees added successfully',
@@ -198,6 +220,7 @@ export class BookingController {
   @Delete(':id')
   async deleteBooking(@Param('id') bookingId: string) {
     await this.bookingService.deleteBooking(bookingId);
+    await this.bumpCacheVersion();
     return {
       success: true,
       message: 'Booking deleted successfully',
@@ -221,16 +244,19 @@ export class BookingController {
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
   ) {
-    const bookings = await this.bookingService.getBookingsByRoomAndDateRange(
-      roomId,
-      new Date(startDate),
-      new Date(endDate),
-    );
-    return {
-      success: true,
-      data: bookings,
-      total: bookings.length,
-    };
+    const key = this.serializeQuery({ roomId, startDate, endDate });
+    return this.getOrSetCache('room-range', key, async () => {
+      const bookings = await this.bookingService.getBookingsByRoomAndDateRange(
+        roomId,
+        new Date(startDate),
+        new Date(endDate),
+      );
+      return {
+        success: true,
+        data: bookings,
+        total: bookings.length,
+      };
+    });
   }
 
 
@@ -283,12 +309,59 @@ export class BookingController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get('by-room/:roomId')
   async findByRoom(@Param('roomId') roomId: string) {
-    return ResponseBuilder.createResponse({
-      statusCode: 200,
-      message: 'Bookings retrieved successfully',
-      data: await this.bookingService.findByRoom(roomId),
-    });
+    return this.getOrSetCache('by-room', roomId, async () =>
+      ResponseBuilder.createResponse({
+        statusCode: 200,
+        message: 'Bookings retrieved successfully',
+        data: await this.bookingService.findByRoom(roomId),
+      }),
+    );
   }
 
-  
+  private async getOrSetCache<T>(
+    scope: string,
+    suffix: string,
+    factory: () => Promise<T>,
+  ): Promise<T> {
+    const version = await this.getCacheVersion();
+    const key = `booking:${scope}:v${version}:${suffix}`;
+    const cached = await this.cacheManager.get<T>(key);
+
+    if (cached !== undefined && cached !== null) {
+      return cached;
+    }
+
+    const fresh = await factory();
+    await this.cacheManager.set(key, fresh, this.cacheTtl);
+    return fresh;
+  }
+
+  private async getCacheVersion(): Promise<number> {
+    const value = await this.cacheManager.get<number>(this.cacheVersionKey);
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+      return value;
+    }
+
+    await this.cacheManager.set(this.cacheVersionKey, 1);
+    return 1;
+  }
+
+  private async bumpCacheVersion(): Promise<void> {
+    const version = await this.getCacheVersion();
+    await this.cacheManager.set(this.cacheVersionKey, version + 1);
+  }
+
+  private serializeQuery(query: Record<string, unknown>): string {
+    const normalized = Object.keys(query || {})
+      .sort()
+      .reduce((result, key) => {
+        const value = query[key];
+        if (value !== undefined && value !== null && value !== '') {
+          result[key] = value;
+        }
+        return result;
+      }, {} as Record<string, unknown>);
+
+    return JSON.stringify(normalized);
+  }
 }

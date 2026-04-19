@@ -1,8 +1,10 @@
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import {
   Body,
   Controller,
   Delete,
   Get,
+  Inject,
   Param,
   Patch,
   Post,
@@ -20,6 +22,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { plainToInstance } from 'class-transformer';
+import { Cache } from 'cache-manager';
 
 import {
   CreateReportDto,
@@ -38,7 +41,13 @@ import { ResponseBuilder } from '../../lib/dto/response-builder.dto';
 @ApiBearerAuth()
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 export class ReportController {
-  constructor(private readonly reportService: ReportService) {}
+  private readonly cacheVersionKey = 'report:cache:version';
+  private readonly cacheTtl = 60_000;
+
+  constructor(
+    private readonly reportService: ReportService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new weekly report' })
@@ -51,6 +60,7 @@ export class ReportController {
   async create(@Body() dto: CreateReportDto, @Req() req: any) {
     const employeeId = req.user.userId;
     const report = await this.reportService.createReport(dto, employeeId);
+    await this.bumpCacheVersion();
     const data = plainToInstance(ReportResponseDto, report, {
       excludeExtraneousValues: true,
     });
@@ -70,15 +80,17 @@ export class ReportController {
     type: ReportListResponseDto,
   })
   async list(@Query() query: QueryReportDto) {
-    const result = await this.reportService.getReports(query);
-    const data = plainToInstance(ReportListResponseDto, result, {
-      excludeExtraneousValues: true,
-    });
+    return this.getOrSetCache('list', this.serializeQuery(query as unknown as Record<string, unknown>), async () => {
+      const result = await this.reportService.getReports(query);
+      const data = plainToInstance(ReportListResponseDto, result, {
+        excludeExtraneousValues: true,
+      });
 
-    return ResponseBuilder.createResponse({
-      statusCode: 200,
-      message: 'Reports retrieved successfully',
-      data,
+      return ResponseBuilder.createResponse({
+        statusCode: 200,
+        message: 'Reports retrieved successfully',
+        data,
+      });
     });
   }
 
@@ -95,15 +107,18 @@ export class ReportController {
     @Req() req: any,
   ) {
     const employeeId = req.user.userId;
-    const result = await this.reportService.getMyReports(employeeId, query);
-    const data = plainToInstance(ReportListResponseDto, result, {
-      excludeExtraneousValues: true,
-    });
+    const key = this.serializeQuery({ employeeId, ...(query as Record<string, unknown>) });
+    return this.getOrSetCache('my', key, async () => {
+      const result = await this.reportService.getMyReports(employeeId, query);
+      const data = plainToInstance(ReportListResponseDto, result, {
+        excludeExtraneousValues: true,
+      });
 
-    return ResponseBuilder.createResponse({
-      statusCode: 200,
-      message: 'My reports retrieved successfully',
-      data,
+      return ResponseBuilder.createResponse({
+        statusCode: 200,
+        message: 'My reports retrieved successfully',
+        data,
+      });
     });
   }
 
@@ -115,15 +130,17 @@ export class ReportController {
     type: ReportResponseDto,
   })
   async getById(@Param('id') id: string) {
-    const report = await this.reportService.getReportById(id);
-    const data = plainToInstance(ReportResponseDto, report, {
-      excludeExtraneousValues: true,
-    });
+    return this.getOrSetCache('by-id', id, async () => {
+      const report = await this.reportService.getReportById(id);
+      const data = plainToInstance(ReportResponseDto, report, {
+        excludeExtraneousValues: true,
+      });
 
-    return ResponseBuilder.createResponse({
-      statusCode: 200,
-      message: 'Report retrieved successfully',
-      data,
+      return ResponseBuilder.createResponse({
+        statusCode: 200,
+        message: 'Report retrieved successfully',
+        data,
+      });
     });
   }
 
@@ -137,6 +154,7 @@ export class ReportController {
   })
   async update(@Param('id') id: string, @Body() dto: UpdateReportDto) {
     const report = await this.reportService.updateReport(id, dto);
+    await this.bumpCacheVersion();
     const data = plainToInstance(ReportResponseDto, report, {
       excludeExtraneousValues: true,
     });
@@ -156,6 +174,7 @@ export class ReportController {
   })
   async delete(@Param('id') id: string) {
     await this.reportService.deleteReport(id);
+    await this.bumpCacheVersion();
 
     return ResponseBuilder.createResponse({
       statusCode: 200,
@@ -173,6 +192,7 @@ export class ReportController {
   })
   async submit(@Param('id') id: string) {
     const report = await this.reportService.submitReport(id);
+    await this.bumpCacheVersion();
     const data = plainToInstance(ReportResponseDto, report, {
       excludeExtraneousValues: true,
     });
@@ -184,7 +204,7 @@ export class ReportController {
     });
   }
 
-  @Get()
+  @Get("/manager")
   @ApiOperation({ summary: 'Get team reports (manager only)' })
   @ApiResponse({
     status: 200,
@@ -192,15 +212,60 @@ export class ReportController {
     type: ReportListResponseDto,
   })
   async getTeamReports(@Query() query: QueryReportDto) {
-    const result = await this.reportService.getTeamReports(query);
-    const data = plainToInstance(ReportListResponseDto, result, {
-      excludeExtraneousValues: true,
-    });
+    return this.getOrSetCache('manager', this.serializeQuery(query as unknown as Record<string, unknown>), async () => {
+      const result = await this.reportService.getTeamReports(query);
+      const data = plainToInstance(ReportListResponseDto, result, {
+        excludeExtraneousValues: true,
+      });
 
-    return ResponseBuilder.createResponse({
-      statusCode: 200,
-      message: 'Team reports retrieved successfully',
-      data,
+      return ResponseBuilder.createResponse({
+        statusCode: 200,
+        message: 'Team reports retrieved successfully',
+        data,
+      });
     });
+  }
+
+  private async getOrSetCache<T>(scope: string, suffix: string, factory: () => Promise<T>): Promise<T> {
+    const version = await this.getCacheVersion();
+    const key = `report:${scope}:v${version}:${suffix}`;
+    const cached = await this.cacheManager.get<T>(key);
+
+    if (cached !== undefined && cached !== null) {
+      return cached;
+    }
+
+    const fresh = await factory();
+    await this.cacheManager.set(key, fresh, this.cacheTtl);
+    return fresh;
+  }
+
+  private async getCacheVersion(): Promise<number> {
+    const value = await this.cacheManager.get<number>(this.cacheVersionKey);
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+      return value;
+    }
+
+    await this.cacheManager.set(this.cacheVersionKey, 1);
+    return 1;
+  }
+
+  private async bumpCacheVersion(): Promise<void> {
+    const version = await this.getCacheVersion();
+    await this.cacheManager.set(this.cacheVersionKey, version + 1);
+  }
+
+  private serializeQuery(query: Record<string, unknown>): string {
+    const normalized = Object.keys(query || {})
+      .sort()
+      .reduce((result, key) => {
+        const value = query[key];
+        if (value !== undefined && value !== null && value !== '') {
+          result[key] = value;
+        }
+        return result;
+      }, {} as Record<string, unknown>);
+
+    return JSON.stringify(normalized);
   }
 }

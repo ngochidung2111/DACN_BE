@@ -166,6 +166,95 @@ export class AttendanceService {
             });
     }
 
+    async getTodayCheckInStatus(employeeId: string) {
+        const employee = await this.employeeService.findById(employeeId);
+        const now = this.nowUtc7();
+        const dayStart = this.buildUtc7Threshold(now, 0);
+        const dayEnd = this.buildUtc7Threshold(now, 24);
+
+        const attendances = await this.attendanceRepository
+            .createQueryBuilder('attendance')
+            .leftJoin('attendance.employee', 'employee')
+            .where('employee.id = :employeeId', { employeeId: employee.id })
+            .andWhere('attendance.TimeIn >= :dayStart', { dayStart })
+            .andWhere('attendance.TimeIn < :dayEnd', { dayEnd })
+            .orderBy('attendance.TimeIn', 'DESC')
+            .getMany();
+
+        const latest = attendances[0];
+
+        return {
+            date: this.formatUtcDate(now),
+            checkedIn: attendances.length > 0,
+            checkedOut: Boolean(latest?.TimeOut),
+            lastCheckInAt: latest?.TimeIn ?? null,
+            lastCheckOutAt: latest?.TimeOut ?? null,
+            totalCheckIns: attendances.length,
+        };
+    }
+
+    async getDepartmentTodayCheckInStatus(managerId: string) {
+        const manager = await this.employeeService.findById(managerId);
+
+        if (manager.roles !== ROLE.MANAGER && manager.roles !== ROLE.ADMIN) {
+            throw new ForbiddenException('Only manager can view department check-in status');
+        }
+
+        if (!manager.department) {
+            throw new NotFoundException('Department not found for the manager');
+        }
+
+        const now = this.nowUtc7();
+        const dayStart = this.buildUtc7Threshold(now, 0);
+        const dayEnd = this.buildUtc7Threshold(now, 24);
+        const departmentId = manager.department.id;
+        const departmentName = manager.department.name;
+
+        const employees = await this.employeeService.findByDepartmentId(departmentId);
+
+        const attendances = await this.attendanceRepository
+            .createQueryBuilder('attendance')
+            .leftJoinAndSelect('attendance.employee', 'employee')
+            .leftJoin('employee.department', 'department')
+            .where('department.id = :departmentId', { departmentId })
+            .andWhere('attendance.TimeIn >= :dayStart', { dayStart })
+            .andWhere('attendance.TimeIn < :dayEnd', { dayEnd })
+            .orderBy('attendance.TimeIn', 'DESC')
+            .getMany();
+
+        const workedEmployeeIds = new Set<string>();
+
+        for (const attendance of attendances) {
+            const employeeIdValue = attendance.employee?.id;
+            if (employeeIdValue) {
+                workedEmployeeIds.add(employeeIdValue);
+            }
+        }
+
+        const employeeStatuses = employees.map((employee) => {
+            return {
+                employeeId: employee.id,
+                email: employee.email,
+                firstName: employee.firstName,
+                middleName: employee.middleName ?? null,
+                lastName: employee.lastName,
+                worked: workedEmployeeIds.has(employee.id),
+            };
+        });
+
+        const checkedInCount = employeeStatuses.filter((employee) => employee.worked).length;
+
+        return {
+            date: this.formatUtcDate(now),
+            departmentId,
+            departmentName,
+            totalEmployees: employeeStatuses.length,
+            checkedInCount,
+            notCheckedInCount: employeeStatuses.length - checkedInCount,
+            employees: employeeStatuses,
+        };
+    }
+
     async getMonthlyAttendanceSummary(employeeId: string, year: number, month: number) {
         if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
             throw new BadRequestException('Invalid month or year');
