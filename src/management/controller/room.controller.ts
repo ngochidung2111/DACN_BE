@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UploadedFile, UseGuards, UseInterceptors, Inject } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { RoomService } from '../service/room.service';
 import { CreateRoomDto, UpdateRoomDto, RoomResponseDto } from '../dto';
@@ -9,12 +10,19 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiConsumes } from '@nestjs/swagger';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
+import { Cache } from 'cache-manager';
 
 @ApiTags('Rooms')
 @Controller('rooms')
 @ApiBearerAuth()
 export class RoomController {
-  constructor(private readonly roomService: RoomService) {}
+  private readonly cacheVersionKey = 'room:cache:version';
+  private readonly cacheTtl = 60_000;
+
+  constructor(
+    private readonly roomService: RoomService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+  ) {}
 
   // Tạo phòng mới
   @ApiOperation({ summary: 'Tạo phòng mới' })
@@ -31,6 +39,7 @@ export class RoomController {
   @Post()
   async createRoom(@Body() createRoomDto: CreateRoomDto) {
     const room = await this.roomService.createRoom(createRoomDto);
+    await this.bumpCacheVersion();
     return {
       success: true,
       message: 'Room created successfully',
@@ -49,12 +58,14 @@ export class RoomController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get()
   async getAllRooms() {
-    const rooms = await this.roomService.getAllRooms();
-    return {
-      success: true,
-      data: rooms,
-      total: rooms.length,
-    };
+    return this.getOrSetCache('all', 'all', async () => {
+      const rooms = await this.roomService.getAllRooms();
+      return {
+        success: true,
+        data: rooms,
+        total: rooms.length,
+      };
+    });
   }
 
   // Lấy URL tạm thời để xem ảnh phòng
@@ -85,11 +96,13 @@ export class RoomController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get(':id')
   async getRoomById(@Param('id') roomId: string) {
-    const room = await this.roomService.getRoomById(roomId);
-    return {
-      success: true,
-      data: room,
-    };
+    return this.getOrSetCache('by-id', roomId, async () => {
+      const room = await this.roomService.getRoomById(roomId);
+      return {
+        success: true,
+        data: room,
+      };
+    });
   }
 
   @ApiOperation({ summary: 'Upload ảnh phòng qua backend (multipart/form-data)' })
@@ -115,9 +128,10 @@ export class RoomController {
   @Post(':id/image/upload')
   async uploadRoomImage(
     @Param('id') roomId: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: any,
   ) {
     const data = await this.roomService.uploadRoomImage(roomId, file);
+    await this.bumpCacheVersion();
 
     return {
       success: true,
@@ -145,6 +159,7 @@ export class RoomController {
     @Body() updateRoomDto: UpdateRoomDto,
   ) {
     const room = await this.roomService.updateRoom(roomId, updateRoomDto);
+    await this.bumpCacheVersion();
     return {
       success: true,
       message: 'Room updated successfully',
@@ -163,6 +178,7 @@ export class RoomController {
   @Delete(':id')
   async deleteRoom(@Param('id') roomId: string) {
     await this.roomService.deleteRoom(roomId);
+    await this.bumpCacheVersion();
     return {
       success: true,
       message: 'Room deleted successfully',
@@ -182,11 +198,47 @@ export class RoomController {
   @Roles(ROLE.ADMIN)
   @Get('search/capacity')
   async findRoomsByCapacity(@Query('minCapacity') minCapacity: string) {
-    const rooms = await this.roomService.findRoomsByCapacity(parseInt(minCapacity, 10));
-    return {
-      success: true,
-      data: rooms,
-      total: rooms.length,
-    };
+    const parsedCapacity = parseInt(minCapacity, 10);
+    return this.getOrSetCache('search-capacity', String(parsedCapacity), async () => {
+      const rooms = await this.roomService.findRoomsByCapacity(parsedCapacity);
+      return {
+        success: true,
+        data: rooms,
+        total: rooms.length,
+      };
+    });
+  }
+
+  private async getOrSetCache<T>(
+    scope: string,
+    suffix: string,
+    factory: () => Promise<T>,
+  ): Promise<T> {
+    const version = await this.getCacheVersion();
+    const key = `room:${scope}:v${version}:${suffix}`;
+    const cached = await this.cacheManager.get<T>(key);
+
+    if (cached !== undefined && cached !== null) {
+      return cached;
+    }
+
+    const fresh = await factory();
+    await this.cacheManager.set(key, fresh, this.cacheTtl);
+    return fresh;
+  }
+
+  private async getCacheVersion(): Promise<number> {
+    const value = await this.cacheManager.get<number>(this.cacheVersionKey);
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+      return value;
+    }
+
+    await this.cacheManager.set(this.cacheVersionKey, 1);
+    return 1;
+  }
+
+  private async bumpCacheVersion(): Promise<void> {
+    const version = await this.getCacheVersion();
+    await this.cacheManager.set(this.cacheVersionKey, version + 1);
   }
 }

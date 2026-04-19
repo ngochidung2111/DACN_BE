@@ -1,6 +1,8 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Body, Controller, Delete, Get, Inject, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Cache } from 'cache-manager';
 
 import { CreateLeaveRequestDto, ProcessLeaveRequestDto, QueryLeaveRequestDto, UpdateLeaveRequestDto } from '../dto';
 import { ROLE } from '../entity/constants';
@@ -13,7 +15,13 @@ import { ResponseBuilder } from '../../lib/dto/response-builder.dto';
 @Controller('leave-requests')
 @ApiBearerAuth()
 export class LeaveRequestController {
-  constructor(private readonly leaveRequestService: LeaveRequestService) {}
+  private readonly cacheVersionKey = 'leave-request:cache:version';
+  private readonly cacheTtl = 60_000;
+
+  constructor(
+    private readonly leaveRequestService: LeaveRequestService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+  ) {}
 
   @ApiOperation({ summary: 'Submit leave request' })
   @ApiBody({ type: CreateLeaveRequestDto })
@@ -30,6 +38,7 @@ export class LeaveRequestController {
       req.user.userId,
       createLeaveRequestDto,
     );
+    await this.bumpCacheVersion();
 
     return {
       success: true,
@@ -52,15 +61,18 @@ export class LeaveRequestController {
   @Roles(ROLE.MANAGER)
   @Get('department')
   async getDepartmentLeaveRequests(@Request() req, @Query() query: QueryLeaveRequestDto) {
-    const result = await this.leaveRequestService.getDepartmentLeaveRequestsForManager(
-      req.user.userId,
-      query,
-    );
+    const key = this.serializeQuery({ userId: req.user.userId, ...query });
+    return this.getOrSetCache('department', key, async () => {
+      const result = await this.leaveRequestService.getDepartmentLeaveRequestsForManager(
+        req.user.userId,
+        query,
+      );
 
-    return ResponseBuilder.createResponse({
-      statusCode: 200,
-      message: 'Leave requests retrieved successfully',
-      data: result,
+      return ResponseBuilder.createResponse({
+        statusCode: 200,
+        message: 'Leave requests retrieved successfully',
+        data: result,
+      });
     });
   }
 
@@ -75,11 +87,14 @@ export class LeaveRequestController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get('my')
   async getMyLeaveRequests(@Request() req, @Query() query: QueryLeaveRequestDto) {
-    const result = await this.leaveRequestService.getMyLeaveRequests(req.user.userId, query);
-    return ResponseBuilder.createResponse({
-      statusCode: 200,
-      message: 'My leave requests retrieved successfully',
-      data: result,
+    const key = this.serializeQuery({ userId: req.user.userId, ...query });
+    return this.getOrSetCache('my', key, async () => {
+      const result = await this.leaveRequestService.getMyLeaveRequests(req.user.userId, query);
+      return ResponseBuilder.createResponse({
+        statusCode: 200,
+        message: 'My leave requests retrieved successfully',
+        data: result,
+      });
     });
   }
 
@@ -104,6 +119,7 @@ export class LeaveRequestController {
       leaveRequestId,
       body,
     );
+    await this.bumpCacheVersion();
 
     return ResponseBuilder.createResponse({
       statusCode: 200,
@@ -133,6 +149,7 @@ export class LeaveRequestController {
     @Body() body: UpdateLeaveRequestDto,
   ) {
     const data = await this.leaveRequestService.updateMyLeaveRequest(req.user.userId, leaveRequestId, body);
+    await this.bumpCacheVersion();
 
     return ResponseBuilder.createResponse({
       statusCode: 200,
@@ -147,12 +164,15 @@ export class LeaveRequestController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get('summary/my')
   async getMyLeaveSummary(@Request() req) {
-    const data = await this.leaveRequestService.getMyLeaveSummary(req.user.userId);
+    const key = this.serializeQuery({ userId: req.user.userId });
+    return this.getOrSetCache('summary-my', key, async () => {
+      const data = await this.leaveRequestService.getMyLeaveSummary(req.user.userId);
 
-    return ResponseBuilder.createResponse({
-      statusCode: 200,
-      message: 'Leave summary retrieved successfully',
-      data,
+      return ResponseBuilder.createResponse({
+        statusCode: 200,
+        message: 'Leave summary retrieved successfully',
+        data,
+      });
     });
   }
 
@@ -164,12 +184,15 @@ export class LeaveRequestController {
   @Roles(ROLE.MANAGER)
   @Get('summary/department')
   async getDepartmentLeaveSummary(@Request() req) {
-    const data = await this.leaveRequestService.getDepartmentLeaveSummary(req.user.userId);
+    const key = this.serializeQuery({ userId: req.user.userId });
+    return this.getOrSetCache('summary-department', key, async () => {
+      const data = await this.leaveRequestService.getDepartmentLeaveSummary(req.user.userId);
 
-    return ResponseBuilder.createResponse({
-      statusCode: 200,
-      message: 'Department leave summary retrieved successfully',
-      data,
+      return ResponseBuilder.createResponse({
+        statusCode: 200,
+        message: 'Department leave summary retrieved successfully',
+        data,
+      });
     });
   }
 
@@ -182,12 +205,15 @@ export class LeaveRequestController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get(':id')
   async getLeaveRequestDetail(@Request() req, @Param('id') leaveRequestId: string) {
-    const detail = await this.leaveRequestService.getLeaveRequestDetail(req.user.userId, leaveRequestId);
+    const key = this.serializeQuery({ userId: req.user.userId, leaveRequestId });
+    return this.getOrSetCache('detail', key, async () => {
+      const detail = await this.leaveRequestService.getLeaveRequestDetail(req.user.userId, leaveRequestId);
 
-    return ResponseBuilder.createResponse({
-      statusCode: 200,
-      message: 'Leave request detail retrieved successfully',
-      data: detail,
+      return ResponseBuilder.createResponse({
+        statusCode: 200,
+        message: 'Leave request detail retrieved successfully',
+        data: detail,
+      });
     });
   }
 
@@ -202,11 +228,55 @@ export class LeaveRequestController {
   @Delete('my/:id')
   async deleteMyLeaveRequest(@Request() req, @Param('id') leaveRequestId: string) {
     await this.leaveRequestService.deleteMyLeaveRequest(req.user.userId, leaveRequestId);
+    await this.bumpCacheVersion();
 
     return ResponseBuilder.createResponse({
       statusCode: 200,
       message: 'Leave request deleted successfully',
       data: null,
     });
+  }
+
+  private async getOrSetCache<T>(scope: string, suffix: string, factory: () => Promise<T>): Promise<T> {
+    const version = await this.getCacheVersion();
+    const key = `leave-request:${scope}:v${version}:${suffix}`;
+    const cached = await this.cacheManager.get<T>(key);
+
+    if (cached !== undefined && cached !== null) {
+      return cached;
+    }
+
+    const fresh = await factory();
+    await this.cacheManager.set(key, fresh, this.cacheTtl);
+    return fresh;
+  }
+
+  private async getCacheVersion(): Promise<number> {
+    const value = await this.cacheManager.get<number>(this.cacheVersionKey);
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+      return value;
+    }
+
+    await this.cacheManager.set(this.cacheVersionKey, 1);
+    return 1;
+  }
+
+  private async bumpCacheVersion(): Promise<void> {
+    const version = await this.getCacheVersion();
+    await this.cacheManager.set(this.cacheVersionKey, version + 1);
+  }
+
+  private serializeQuery(query: Record<string, unknown>): string {
+    const normalized = Object.keys(query || {})
+      .sort()
+      .reduce((result, key) => {
+        const value = query[key];
+        if (value !== undefined && value !== null && value !== '') {
+          result[key] = value;
+        }
+        return result;
+      }, {} as Record<string, unknown>);
+
+    return JSON.stringify(normalized);
   }
 }

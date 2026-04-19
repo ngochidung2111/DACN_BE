@@ -1,8 +1,10 @@
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import {
   Body,
   Controller,
   Delete,
   Get,
+  Inject,
   Param,
   Patch,
   Post,
@@ -20,6 +22,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { plainToInstance } from 'class-transformer';
+import { Cache } from 'cache-manager';
 
 import { ROLE } from '../entity/constants';
 import {
@@ -49,7 +52,13 @@ import { ResponseBuilder } from '../../lib/dto/response-builder.dto';
 @ApiBearerAuth()
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 export class TicketController {
-  constructor(private readonly ticketService: TicketService) {}
+  private readonly cacheVersionKey = 'ticket:cache:version';
+  private readonly cacheTtl = 60_000;
+
+  constructor(
+    private readonly ticketService: TicketService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+  ) {}
 
   /**
    * Create a new ticket category
@@ -65,6 +74,7 @@ export class TicketController {
   @Roles(ROLE.ADMIN, ROLE.MANAGER)
   async createCategory(@Body() dto: CreateTicketCategoryDto) {
     const category = await this.ticketService.createTicketCategory(dto);
+    await this.bumpCacheVersion();
     return ResponseBuilder.createResponse({
       statusCode: 201,
       message: 'Ticket category created successfully',
@@ -84,11 +94,13 @@ export class TicketController {
   })
   @Roles(ROLE.ADMIN, ROLE.MANAGER)
   async getCategories(@Query() query: QueryTicketCategoryDto) {
-    const categories = await this.ticketService.getTicketCategories(query);
-    return ResponseBuilder.createResponse({
-      statusCode: 200,
-      message: 'Ticket categories retrieved successfully',
-      data: categories,
+    return this.getOrSetCache('categories', this.serializeQuery(query as Record<string, unknown>), async () => {
+      const categories = await this.ticketService.getTicketCategories(query);
+      return ResponseBuilder.createResponse({
+        statusCode: 200,
+        message: 'Ticket categories retrieved successfully',
+        data: categories,
+      });
     });
   }
 
@@ -103,11 +115,13 @@ export class TicketController {
     type: [TicketCategoryResponseDto],
   })
   async getAllCategories() {
-    const categories = await this.ticketService.getAllTicketCategories();
-    return ResponseBuilder.createResponse({
-      statusCode: 200,
-      message: 'All ticket categories retrieved successfully',
-      data: categories,
+    return this.getOrSetCache('categories-all', 'all', async () => {
+      const categories = await this.ticketService.getAllTicketCategories();
+      return ResponseBuilder.createResponse({
+        statusCode: 200,
+        message: 'All ticket categories retrieved successfully',
+        data: categories,
+      });
     });
   }
 
@@ -130,6 +144,7 @@ export class TicketController {
       departmentId,
       dto,
     );
+    await this.bumpCacheVersion();
 
     return ResponseBuilder.createResponse({
       statusCode: 200,
@@ -152,6 +167,7 @@ export class TicketController {
   async create(@Body() dto: CreateTicketDto, @Req() req: any) {
     const employeeId = req.user.userId; // Get employee ID from JWT token
     const ticket = await this.ticketService.createTicket(dto, employeeId);
+    await this.bumpCacheVersion();
     return ResponseBuilder.createResponse({
       statusCode: 201,
       message: 'Ticket created successfully',
@@ -171,15 +187,17 @@ export class TicketController {
   })
   @Roles(ROLE.ADMIN, ROLE.MANAGER)
   async list(@Query() query: QueryTicketDto) {
-    const result = await this.ticketService.getTickets(query);
-    const data = plainToInstance(TicketListResponseDto, result, {
-      excludeExtraneousValues: true,
-    });
+    return this.getOrSetCache('list', this.serializeQuery(query as unknown as Record<string, unknown>), async () => {
+      const result = await this.ticketService.getTickets(query);
+      const data = plainToInstance(TicketListResponseDto, result, {
+        excludeExtraneousValues: true,
+      });
 
-    return ResponseBuilder.createResponse({
-      statusCode: 200,
-      message: 'Tickets retrieved successfully',
-      data,
+      return ResponseBuilder.createResponse({
+        statusCode: 200,
+        message: 'Tickets retrieved successfully',
+        data,
+      });
     });
   }
 
@@ -200,13 +218,14 @@ export class TicketController {
   ) {
     // In real scenario, get employeeId from JWT token
     const employeeId = req.user.userId;
-    const result = await this.ticketService.getMyTickets(employeeId, query);
-    console.log(employeeId);
-    
-    return ResponseBuilder.createResponse({
-      statusCode: 200,
-      message: 'My tickets retrieved successfully',
-      data: result,
+    const key = this.serializeQuery({ employeeId, ...(query as Record<string, unknown>) });
+    return this.getOrSetCache('my', key, async () => {
+      const result = await this.ticketService.getMyTickets(employeeId, query);
+      return ResponseBuilder.createResponse({
+        statusCode: 200,
+        message: 'My tickets retrieved successfully',
+        data: result,
+      });
     });
   }
 
@@ -227,15 +246,18 @@ export class TicketController {
   ) {
     // In real scenario, get employeeId from JWT token
     const employeeId = req.user.userId;
-    const result = await this.ticketService.getAssignedToMe(employeeId, query);
-    const data = plainToInstance(TicketListResponseDto, result, {
-      excludeExtraneousValues: true,
-    });
+    const key = this.serializeQuery({ employeeId, ...(query as Record<string, unknown>) });
+    return this.getOrSetCache('assigned-me', key, async () => {
+      const result = await this.ticketService.getAssignedToMe(employeeId, query);
+      const data = plainToInstance(TicketListResponseDto, result, {
+        excludeExtraneousValues: true,
+      });
 
-    return ResponseBuilder.createResponse({
-      statusCode: 200,
-      message: 'Assigned tickets retrieved successfully',
-      data,
+      return ResponseBuilder.createResponse({
+        statusCode: 200,
+        message: 'Assigned tickets retrieved successfully',
+        data,
+      });
     });
   }
 
@@ -256,15 +278,18 @@ export class TicketController {
     @Req() req: any,
   ) {
     const managerId = req.user.userId;
-    const result = await this.ticketService.getDepartmentTicketsForManager(managerId, query);
-    const data = plainToInstance(TicketListResponseDto, result, {
-      excludeExtraneousValues: true,
-    });
+    const key = this.serializeQuery({ managerId, ...(query as unknown as Record<string, unknown>) });
+    return this.getOrSetCache('manager-department', key, async () => {
+      const result = await this.ticketService.getDepartmentTicketsForManager(managerId, query);
+      const data = plainToInstance(TicketListResponseDto, result, {
+        excludeExtraneousValues: true,
+      });
 
-    return ResponseBuilder.createResponse({
-      statusCode: 200,
-      message: 'Department tickets retrieved successfully',
-      data,
+      return ResponseBuilder.createResponse({
+        statusCode: 200,
+        message: 'Department tickets retrieved successfully',
+        data,
+      });
     });
   }
 
@@ -294,6 +319,7 @@ export class TicketController {
       id,
       dto,
     );
+    await this.bumpCacheVersion();
 
     return ResponseBuilder.createResponse({
       statusCode: 200,
@@ -313,11 +339,13 @@ export class TicketController {
   })
   @Roles(ROLE.ADMIN, ROLE.MANAGER)
   async getStats() {
-    const stats = await this.ticketService.getTicketStats();
-    return ResponseBuilder.createResponse({
-      statusCode: 200,
-      message: 'Statistics retrieved successfully',
-      data: stats,
+    return this.getOrSetCache('stats', 'all', async () => {
+      const stats = await this.ticketService.getTicketStats();
+      return ResponseBuilder.createResponse({
+        statusCode: 200,
+        message: 'Statistics retrieved successfully',
+        data: stats,
+      });
     });
   }
 
@@ -332,11 +360,13 @@ export class TicketController {
     type: TicketResponseDto,
   })
   async getById(@Param('id') id: string) {
-    const ticket = await this.ticketService.getTicketById(id);
-    return ResponseBuilder.createResponse({
-      statusCode: 200,
-      message: 'Ticket retrieved successfully',
-      data: ticket,
+    return this.getOrSetCache('by-id', id, async () => {
+      const ticket = await this.ticketService.getTicketById(id);
+      return ResponseBuilder.createResponse({
+        statusCode: 200,
+        message: 'Ticket retrieved successfully',
+        data: ticket,
+      });
     });
   }
 
@@ -353,6 +383,7 @@ export class TicketController {
   })
   async update(@Param('id') id: string, @Body() dto: UpdateTicketDto) {
     const ticket = await this.ticketService.updateTicket(id, dto);
+    await this.bumpCacheVersion();
     return ResponseBuilder.createResponse({
       statusCode: 200,
       message: 'Ticket updated successfully',
@@ -371,6 +402,7 @@ export class TicketController {
   })
   async delete(@Param('id') id: string) {
     await this.ticketService.deleteTicket(id);
+    await this.bumpCacheVersion();
     return ResponseBuilder.createResponse({
       statusCode: 200,
       message: 'Ticket deleted successfully',
@@ -391,6 +423,7 @@ export class TicketController {
   })
   async assign(@Param('id') id: string, @Body() dto: AssignTicketDto) {
     const ticket = await this.ticketService.assignTicket(id, dto);
+    await this.bumpCacheVersion();
     return ResponseBuilder.createResponse({
       statusCode: 200,
       message: 'Ticket assigned successfully',
@@ -417,6 +450,7 @@ export class TicketController {
     // In real scenario, get actorId from JWT token
     const actorId = req.user.userId; // Placeholder
     const ticket = await this.ticketService.updateTicketStatus(id, dto, actorId);
+    await this.bumpCacheVersion();
     return ResponseBuilder.createResponse({
       statusCode: 200,
       message: 'Ticket status updated successfully',
@@ -444,6 +478,7 @@ export class TicketController {
     const actorId = req.user.userId     ; // Assuming the user ID is stored in the request object
 
     const process = await this.ticketService.addTicketProcess(id, dto, actorId);
+    await this.bumpCacheVersion();
     return ResponseBuilder.createResponse({
       statusCode: 201,
       message: 'Process added successfully',
@@ -462,11 +497,56 @@ export class TicketController {
     type: TicketTimelineResponseDto,
   })
   async getTimeline(@Param('id') id: string) {
-    const timeline = await this.ticketService.getTicketTimeline(id);
-    return ResponseBuilder.createResponse({
-      statusCode: 200,
-      message: 'Timeline retrieved successfully',
-      data: timeline,
+    return this.getOrSetCache('timeline', id, async () => {
+      const timeline = await this.ticketService.getTicketTimeline(id);
+      return ResponseBuilder.createResponse({
+        statusCode: 200,
+        message: 'Timeline retrieved successfully',
+        data: timeline,
+      });
     });
+  }
+
+  private async getOrSetCache<T>(scope: string, suffix: string, factory: () => Promise<T>): Promise<T> {
+    const version = await this.getCacheVersion();
+    const key = `ticket:${scope}:v${version}:${suffix}`;
+    const cached = await this.cacheManager.get<T>(key);
+
+    if (cached !== undefined && cached !== null) {
+      return cached;
+    }
+
+    const fresh = await factory();
+    await this.cacheManager.set(key, fresh, this.cacheTtl);
+    return fresh;
+  }
+
+  private async getCacheVersion(): Promise<number> {
+    const value = await this.cacheManager.get<number>(this.cacheVersionKey);
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+      return value;
+    }
+
+    await this.cacheManager.set(this.cacheVersionKey, 1);
+    return 1;
+  }
+
+  private async bumpCacheVersion(): Promise<void> {
+    const version = await this.getCacheVersion();
+    await this.cacheManager.set(this.cacheVersionKey, version + 1);
+  }
+
+  private serializeQuery(query: Record<string, unknown>): string {
+    const normalized = Object.keys(query || {})
+      .sort()
+      .reduce((result, key) => {
+        const value = query[key];
+        if (value !== undefined && value !== null && value !== '') {
+          result[key] = value;
+        }
+        return result;
+      }, {} as Record<string, unknown>);
+
+    return JSON.stringify(normalized);
   }
 }

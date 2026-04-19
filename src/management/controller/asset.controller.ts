@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Body, Controller, Delete, Get, Inject, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import {
   ApiBearerAuth,
@@ -25,12 +26,19 @@ import { ASSET_CONDITION, ROLE } from '../entity/constants';
 import { AssetService } from '../service/asset.service';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
+import { Cache } from 'cache-manager';
 
 @ApiTags('Assets')
 @Controller('assets')
 @ApiBearerAuth()
 export class AssetController {
-  constructor(private readonly assetService: AssetService) {}
+  private readonly cacheVersionKey = 'asset:cache:version';
+  private readonly cacheTtl = 60_000;
+
+  constructor(
+    private readonly assetService: AssetService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+  ) {}
 
   @ApiOperation({ summary: 'Create asset' })
   @ApiBody({ type: CreateAssetDto })
@@ -40,6 +48,7 @@ export class AssetController {
   @Post()
   async createAsset(@Body() body: CreateAssetDto) {
     const asset = await this.assetService.createAsset(body);
+    await this.bumpCacheVersion();
     return {
       success: true,
       message: 'Asset created successfully',
@@ -59,11 +68,13 @@ export class AssetController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get()
   async getAssets(@Query() query: QueryAssetDto) {
-    const result = await this.assetService.getAssets(query);
-    return {
-      success: true,
-      data: result,
-    };
+    return this.getOrSetCache('list', this.serializeQuery(query as Record<string, unknown>), async () => {
+      const result = await this.assetService.getAssets(query);
+      return {
+        success: true,
+        data: result,
+      };
+    });
   }
 
   @ApiOperation({ summary: 'Get PUBLIC assets by location' })
@@ -76,12 +87,15 @@ export class AssetController {
     @Query('location') location: string,
     @Query('condition') condition?: ASSET_CONDITION,
   ) {
-    const assets = await this.assetService.getPublicAssetsByLocation(location, condition);
-    return {
-      success: true,
-      data: assets,
-      total: assets.length,
-    };
+    const key = this.serializeQuery({ location, condition });
+    return this.getOrSetCache('public-by-location', key, async () => {
+      const assets = await this.assetService.getPublicAssetsByLocation(location, condition);
+      return {
+        success: true,
+        data: assets,
+        total: assets.length,
+      };
+    });
   }
 
   @ApiOperation({ summary: 'Get asset summary statistics' })
@@ -90,11 +104,13 @@ export class AssetController {
   @Roles(ROLE.ADMIN, ROLE.MANAGER)
   @Get('stats/summary')
   async getAssetSummaryStats() {
-    const stats = await this.assetService.getAssetSummaryStats();
-    return {
-      success: true,
-      data: stats,
-    };
+    return this.getOrSetCache('stats-summary', 'all', async () => {
+      const stats = await this.assetService.getAssetSummaryStats();
+      return {
+        success: true,
+        data: stats,
+      };
+    });
   }
 
   @ApiOperation({ summary: 'Get maintenance due assets' })
@@ -107,11 +123,14 @@ export class AssetController {
     @Query('page') page?: number,
     @Query('pageSize') pageSize?: number,
   ) {
-    const result = await this.assetService.getMaintenanceDueAssets(page, pageSize);
-    return {
-      success: true,
-      data: result,
-    };
+    const key = this.serializeQuery({ page, pageSize });
+    return this.getOrSetCache('maintenance-due', key, async () => {
+      const result = await this.assetService.getMaintenanceDueAssets(page, pageSize);
+      return {
+        success: true,
+        data: result,
+      };
+    });
   }
 
   @ApiOperation({ summary: 'Get asset by ID' })
@@ -120,11 +139,13 @@ export class AssetController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get(':id')
   async getAssetById(@Param('id') assetId: string) {
-    const asset = await this.assetService.getAssetById(assetId);
-    return {
-      success: true,
-      data: asset,
-    };
+    return this.getOrSetCache('by-id', assetId, async () => {
+      const asset = await this.assetService.getAssetById(assetId);
+      return {
+        success: true,
+        data: asset,
+      };
+    });
   }
 
   @ApiOperation({ summary: 'Update asset' })
@@ -136,6 +157,7 @@ export class AssetController {
   @Patch(':id')
   async updateAsset(@Param('id') assetId: string, @Body() body: UpdateAssetDto) {
     const asset = await this.assetService.updateAsset(assetId, body);
+    await this.bumpCacheVersion();
     return {
       success: true,
       message: 'Asset updated successfully',
@@ -155,6 +177,7 @@ export class AssetController {
     @Body() body: UpdateAssetConditionDto,
   ) {
     const asset = await this.assetService.updateAssetCondition(assetId, body);
+    await this.bumpCacheVersion();
     return {
       success: true,
       message: 'Asset condition updated successfully',
@@ -171,6 +194,7 @@ export class AssetController {
   @Post(':id/assign')
   async assignPrivateAsset(@Param('id') assetId: string, @Body() body: AssignAssetDto) {
     const data = await this.assetService.assignPrivateAsset(assetId, body);
+    await this.bumpCacheVersion();
     return {
       success: true,
       message: 'Asset assigned successfully',
@@ -187,6 +211,7 @@ export class AssetController {
   @Post(':id/return')
   async returnPrivateAsset(@Param('id') assetId: string, @Body() body: ReturnAssetDto) {
     const data = await this.assetService.returnPrivateAsset(assetId, body);
+    await this.bumpCacheVersion();
     return {
       success: true,
       message: 'Asset returned successfully',
@@ -203,6 +228,7 @@ export class AssetController {
   @Post(':id/transfer')
   async transferPrivateAsset(@Param('id') assetId: string, @Body() body: TransferAssetDto) {
     const data = await this.assetService.transferPrivateAsset(assetId, body);
+    await this.bumpCacheVersion();
     return {
       success: true,
       message: 'Asset transferred successfully',
@@ -216,12 +242,14 @@ export class AssetController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get(':id/assignments')
   async getAssetAssignments(@Param('id') assetId: string) {
-    const assignments = await this.assetService.getAssetAssignments(assetId);
-    return {
-      success: true,
-      data: assignments,
-      total: assignments.length,
-    };
+    return this.getOrSetCache('assignments', assetId, async () => {
+      const assignments = await this.assetService.getAssetAssignments(assetId);
+      return {
+        success: true,
+        data: assignments,
+        total: assignments.length,
+      };
+    });
   }
 
   @ApiOperation({ summary: 'Update location for PUBLIC asset' })
@@ -236,6 +264,7 @@ export class AssetController {
     @Body() body: UpdateAssetLocationDto,
   ) {
     const asset = await this.assetService.updatePublicAssetLocation(assetId, body);
+    await this.bumpCacheVersion();
     return {
       success: true,
       message: 'Asset location updated successfully',
@@ -251,9 +280,53 @@ export class AssetController {
   @Delete(':id')
   async deleteAsset(@Param('id') assetId: string) {
     await this.assetService.deleteAsset(assetId);
+    await this.bumpCacheVersion();
     return {
       success: true,
       message: 'Asset deleted successfully',
     };
+  }
+
+  private async getOrSetCache<T>(scope: string, suffix: string, factory: () => Promise<T>): Promise<T> {
+    const version = await this.getCacheVersion();
+    const key = `asset:${scope}:v${version}:${suffix}`;
+    const cached = await this.cacheManager.get<T>(key);
+
+    if (cached !== undefined && cached !== null) {
+      return cached;
+    }
+
+    const fresh = await factory();
+    await this.cacheManager.set(key, fresh, this.cacheTtl);
+    return fresh;
+  }
+
+  private async getCacheVersion(): Promise<number> {
+    const value = await this.cacheManager.get<number>(this.cacheVersionKey);
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+      return value;
+    }
+
+    await this.cacheManager.set(this.cacheVersionKey, 1);
+    return 1;
+  }
+
+  private async bumpCacheVersion(): Promise<void> {
+    const version = await this.getCacheVersion();
+    await this.cacheManager.set(this.cacheVersionKey, version + 1);
+  }
+
+  private serializeQuery(query: Record<string, unknown>): string {
+    const normalized = Object.keys(query || {})
+      .sort()
+      .reduce((result, key) => {
+        const value = query[key];
+        if (value !== undefined && value !== null && value !== '') {
+          result[key] = value;
+        }
+        return result;
+      }, {} as Record<string, unknown>);
+
+    return JSON.stringify(normalized);
   }
 }
