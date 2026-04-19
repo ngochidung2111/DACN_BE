@@ -95,6 +95,7 @@ import { Department } from '../auth/entity/department.entity';
     AttendanceService,
     LeaveRequestService,
     AnnouncementService,
+    TicketService,
   ],
 })
 export class ManagementModule {}

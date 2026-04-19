@@ -13,7 +13,9 @@ import { AttendanceService } from '../../management/service/attendance.service';
 import { BookingService } from '../../management/service/booking.service';
 import { LeaveRequestService } from '../../management/service/leave-request.service';
 import { ROLE } from '../../management/entity/constants';
+import { TICKET_STATUS } from '../../management/entity/constants';
 import { RoomService } from '../../management/service/room.service';
+import { TicketService } from '../../management/service/ticket.service';
 
 type ChatParams = {
   userId: string;
@@ -36,6 +38,7 @@ export class AiService {
     private readonly attendanceService: AttendanceService,
     private readonly leaveRequestService: LeaveRequestService,
     private readonly announcementService: AnnouncementService,
+    private readonly ticketService: TicketService,
     private readonly chatHistoryService: ChatHistoryService,
   ) {}
 
@@ -346,6 +349,211 @@ export class AiService {
         },
       }),
       new DynamicTool({
+        name: 'list_my_ticket_categories',
+        description:
+          'List ticket categories available for current user based on department. Input JSON optional: issue_text. Use this before creating a ticket so user can choose category.',
+        func: async (input: string) => {
+          const payload = this.parseJsonInput(input);
+          const issueText = this.readOptionalString(payload.issue_text);
+          const categories = await this.getAvailableTicketCategoriesForUser(params.userId);
+
+          const suggestions = issueText
+            ? this.rankTicketCategoriesByIssue(categories, issueText).slice(0, 3)
+            : [];
+
+          const fallbackSuggestions =
+            categories.length === 0 && issueText
+              ? this.rankTicketCategoriesByIssue(
+                  await this.getActiveTicketCategories(),
+                  issueText,
+                ).slice(0, 3)
+              : [];
+
+          return JSON.stringify({
+            success: true,
+            total: categories.length,
+            using_department_categories: categories.length > 0,
+            message:
+              categories.length > 0
+                ? 'Hay yeu cau user chon 1 category_id trong danh sach truoc khi tao ticket.'
+                : 'Khong co category nao duoc gan cho phong ban cua ban. AI se goi y category phu hop de ban gui admin gan quyen.',
+            data: categories.map((category) => ({
+              id: category.id,
+              name: category.name,
+              description: category.description,
+            })),
+            suggestions: suggestions.map((item) => ({
+              id: item.id,
+              name: item.name,
+              description: item.description,
+              score: item.score,
+              matched_keywords: item.matchedKeywords,
+            })),
+            fallback_suggestions: fallbackSuggestions.map((item) => ({
+              id: item.id,
+              name: item.name,
+              description: item.description,
+              score: item.score,
+              matched_keywords: item.matchedKeywords,
+            })),
+          });
+        },
+      }),
+      new DynamicTool({
+        name: 'suggest_ticket_category',
+        description:
+          'Suggest best ticket category from issue text by matching category name/description. Input JSON required: issue_text. Optional: limit (max 5).',
+        func: async (input: string) => {
+          const payload = this.parseJsonInput(input);
+          const issueText = this.readOptionalString(payload.issue_text);
+
+          if (!issueText) {
+            return JSON.stringify({
+              success: false,
+              error: 'issue_text la bat buoc',
+            });
+          }
+
+          const limit = this.readSafeLimit(payload.limit, 3, 5);
+          const availableCategories = await this.getAvailableTicketCategoriesForUser(params.userId);
+          const allActiveCategories = await this.getActiveTicketCategories();
+
+          const scopedCategories =
+            availableCategories.length > 0 ? availableCategories : allActiveCategories;
+
+          const ranked = this.rankTicketCategoriesByIssue(scopedCategories, issueText).slice(
+            0,
+            limit,
+          );
+
+          return JSON.stringify({
+            success: true,
+            issue_text: issueText,
+            using_department_categories: availableCategories.length > 0,
+            department_category_count: availableCategories.length,
+            total_candidates: scopedCategories.length,
+            recommendations: ranked.map((item) => ({
+              id: item.id,
+              name: item.name,
+              description: item.description,
+              score: item.score,
+              matched_keywords: item.matchedKeywords,
+            })),
+            note:
+              availableCategories.length > 0
+                ? 'Ban co the chon category_id duoc de tao ticket ngay.'
+                : 'Phong ban cua ban chua duoc gan category. Hay gui de xuat nay cho admin/manager de gan quyen truoc khi tao ticket.',
+          });
+        },
+      }),
+      new DynamicTool({
+        name: 'create_my_ticket',
+        description:
+          'Create ticket for current user. Input JSON required: title, description. Category is required via category_id OR category_name. Always call list_my_ticket_categories first and let user choose.',
+        func: async (input: string) => {
+          const payload = this.parseJsonInput(input);
+          const title = String(payload.title || '').trim();
+          const description = String(payload.description || '').trim();
+
+          if (!title || !description) {
+            return JSON.stringify({
+              success: false,
+              error: 'title va description la bat buoc de tao ticket',
+            });
+          }
+
+          const categories = await this.getAvailableTicketCategoriesForUser(params.userId);
+          if (categories.length === 0) {
+            const suggested = this.rankTicketCategoriesByIssue(
+              await this.getActiveTicketCategories(),
+              `${title} ${description}`,
+            ).slice(0, 3);
+
+            return JSON.stringify({
+              success: false,
+              error:
+                'Khong co category nao kha dung cho phong ban cua ban. Vui long lien he quan tri vien.',
+              suggested_categories: suggested.map((item) => ({
+                id: item.id,
+                name: item.name,
+                description: item.description,
+                score: item.score,
+              })),
+            });
+          }
+
+          const categoryId = this.readOptionalString(payload.category_id);
+          const categoryName = this.readOptionalString(payload.category_name);
+
+          const resolvedCategory = this.resolveTicketCategory(categories, categoryId, categoryName);
+
+          if (!resolvedCategory) {
+            return JSON.stringify({
+              success: false,
+              error:
+                'Khong tim thay category phu hop. Vui long chon category_id hop le tu danh sach list_my_ticket_categories.',
+              available_categories: categories.map((category) => ({
+                id: category.id,
+                name: category.name,
+              })),
+            });
+          }
+
+          const ticket = await this.ticketService.createTicket(
+            {
+              category_id: resolvedCategory.id,
+              title,
+              description,
+            },
+            params.userId,
+          );
+
+          return JSON.stringify({
+            success: true,
+            message: 'Tao ticket thanh cong',
+            data: {
+              id: ticket.id,
+              title: ticket.title,
+              description: ticket.description,
+              status: ticket.status,
+              category: ticket.category
+                ? {
+                    id: ticket.category.id,
+                    name: ticket.category.name,
+                  }
+                : null,
+              created_at: ticket.created_at,
+            },
+          });
+        },
+      }),
+      new DynamicTool({
+        name: 'get_my_tickets',
+        description:
+          'Get tickets created by current user. Input JSON optional: page, limit, status, keyword, category_id.',
+        func: async (input: string) => {
+          const payload = this.parseJsonInput(input);
+          const statusValue = this.readOptionalString(payload.status);
+          const normalizedStatus = statusValue?.trim().toUpperCase();
+          const status = normalizedStatus && Object.values(TICKET_STATUS).includes(normalizedStatus as TICKET_STATUS)
+            ? (normalizedStatus as TICKET_STATUS)
+            : undefined;
+
+          const result = await this.ticketService.getMyTickets(params.userId, {
+            page: this.readSafeLimit(payload.page, 1, 1000),
+            limit: this.readSafeLimit(payload.limit, 10, 100),
+            status,
+            keyword: this.readOptionalString(payload.keyword),
+            category_id: this.readOptionalString(payload.category_id),
+          });
+
+          return JSON.stringify({
+            success: true,
+            ...result,
+          });
+        },
+      }),
+      new DynamicTool({
         name: 'get_chat_history',
         description:
           'Get recent chat history of current user in a session. Input JSON supports optional session_id and limit (max 20).',
@@ -515,7 +723,7 @@ export class AiService {
     ];
 
     const systemPrompt =
-      'You are an internal HR assistant. Answer clearly and concisely. Use available tools when needed. Always respond in Vietnamese unless the user asks for another language. You can support profile lookup, attendance, leave requests, announcements, and meeting room booking. For meeting room requests, proactively use tools to check schedule before suggesting booking and confirm booking details after creating one.';
+      'You are an internal HR assistant. Answer clearly and concisely. Use available tools when needed. Always respond in Vietnamese unless the user asks for another language. You can support profile lookup, attendance, leave requests, announcements, ticket support, and meeting room booking. For ticket requests, first call suggest_ticket_category with issue_text, then call list_my_ticket_categories and ask user to choose a category before creating ticket. If department has no category permission, still provide recommendation based on category description and explain that admin/manager must assign permission first. For meeting room requests, proactively use tools to check schedule before suggesting booking and confirm booking details after creating one.';
 
     const agent = createAgent({
       model: llm,
@@ -744,5 +952,96 @@ export class AiService {
 
       return messages;
     });
+  }
+
+  private async getAvailableTicketCategoriesForUser(userId: string) {
+    const employee = await this.employeeService.findById(userId);
+
+    if (!employee.department?.id) {
+      return [];
+    }
+
+    return this.ticketService.getTicketCategories({
+      department_id: employee.department.id,
+    });
+  }
+
+  private async getActiveTicketCategories() {
+    return this.ticketService.getTicketCategories({});
+  }
+
+  private rankTicketCategoriesByIssue(
+    categories: Array<{ id: string; name: string; description?: string | null }>,
+    issueText: string,
+  ): Array<{
+    id: string;
+    name: string;
+    description?: string | null;
+    score: number;
+    matchedKeywords: string[];
+  }> {
+    const normalizedIssue = this.normalizeText(issueText);
+    const keywords = normalizedIssue
+      .split(/[^a-z0-9]+/)
+      .filter((token) => token.length >= 3);
+
+    const uniqueKeywords = Array.from(new Set(keywords));
+
+    return categories
+      .map((category) => {
+        const searchable = this.normalizeText(
+          `${category.name || ''} ${category.description || ''}`,
+        );
+
+        let score = 0;
+        const matchedKeywords: string[] = [];
+
+        if (normalizedIssue.includes(this.normalizeText(category.name || ''))) {
+          score += 6;
+        }
+
+        for (const keyword of uniqueKeywords) {
+          if (searchable.includes(keyword)) {
+            score += 2;
+            matchedKeywords.push(keyword);
+          }
+        }
+
+        return {
+          id: category.id,
+          name: category.name,
+          description: category.description,
+          score,
+          matchedKeywords,
+        };
+      })
+      .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+  }
+
+  private resolveTicketCategory(
+    categories: Array<{ id: string; name: string }>,
+    categoryId?: string,
+    categoryName?: string,
+  ): { id: string; name: string } | undefined {
+    if (categoryId) {
+      return categories.find((category) => category.id === categoryId);
+    }
+
+    if (!categoryName) {
+      return undefined;
+    }
+
+    const normalizedInput = this.normalizeText(categoryName);
+
+    const exact = categories.find(
+      (category) => this.normalizeText(category.name) === normalizedInput,
+    );
+    if (exact) {
+      return exact;
+    }
+
+    return categories.find((category) =>
+      this.normalizeText(category.name).includes(normalizedInput),
+    );
   }
 }

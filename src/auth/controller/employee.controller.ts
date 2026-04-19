@@ -1,9 +1,11 @@
 
 
-import { Body, Controller, Delete, Get, NotFoundException, Param, Post, Request, Res, UseGuards, Query, Patch, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Body, Controller, Delete, Get, Inject, NotFoundException, Param, Post, Request, Res, UseGuards, Query, Patch, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiBody, ApiResponse, ApiTags, ApiQuery, ApiOperation, ApiParam, ApiConsumes } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Cache } from 'cache-manager';
 
 import { Roles } from '../roles.decorator';
 import { RolesGuard } from '../roles.guard';
@@ -21,7 +23,13 @@ import { ResponseBuilder } from '../../lib/dto/response-builder.dto';
 @ApiBearerAuth()
 @Controller('employee')
 export class EmployeeController {
-  constructor(private readonly employeeService: EmployeeService) {
+  private readonly cacheVersionKey = 'employee:cache:version';
+  private readonly cacheTtl = 60_000;
+
+  constructor(
+    private readonly employeeService: EmployeeService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+  ) {
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -29,11 +37,14 @@ export class EmployeeController {
   @ApiResponse({ status: 200, description: 'The user profile.', type: EmployeeDto })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   async getProfile(@Request() req) {
-    const employee = await this.employeeService.findOneByEmail(req.user.email);
-    return ResponseBuilder.createResponse({
-      statusCode: 200,
-      message: 'Profile retrieved successfully',
-      data: plainToInstance(EmployeeDto, employee, { excludeExtraneousValues: true }),
+    const requester = String(req.user.id || req.user.email || 'unknown');
+    return this.getOrSetCache('profile', requester, async () => {
+      const employee = await this.employeeService.findOneByEmail(req.user.email);
+      return ResponseBuilder.createResponse({
+        statusCode: 200,
+        message: 'Profile retrieved successfully',
+        data: plainToInstance(EmployeeDto, employee, { excludeExtraneousValues: true }),
+      });
     });
   }
 
@@ -59,16 +70,18 @@ export class EmployeeController {
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   async getallEmployees(@Query() query: QueryEmployeeDto) {
-    const { data, total, page, pageSize } = await this.employeeService.findAllWithQuery(query as any);
-    return ResponseBuilder.createResponse({
-      statusCode: 200,
-      message: 'Employees retrieved successfully',
-      data: {
-        items: plainToInstance(EmployeeDto, data, { excludeExtraneousValues: true }),
-        total,
-        page,
-        pageSize,
-      },
+    return this.getOrSetCache('all', this.serializeQuery(query), async () => {
+      const { data, total, page, pageSize } = await this.employeeService.findAllWithQuery(query as any);
+      return ResponseBuilder.createResponse({
+        statusCode: 200,
+        message: 'Employees retrieved successfully',
+        data: {
+          items: plainToInstance(EmployeeDto, data, { excludeExtraneousValues: true }),
+          total,
+          page,
+          pageSize,
+        },
+      });
     });
   }
 
@@ -81,6 +94,7 @@ export class EmployeeController {
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   async createEmployeeByAdmin(@Body() body: AdminCreateEmployeeDto) {
     const created = await this.employeeService.createByAdmin(body);
+    await this.bumpCacheVersion();
     return ResponseBuilder.createResponse({
       statusCode: 201,
       message: 'Employee created successfully',
@@ -98,6 +112,7 @@ export class EmployeeController {
   @ApiResponse({ status: 404, description: 'Employee not found.' })
   async updateEmployeeByAdmin(@Param('id') id: string, @Body() body: AdminUpdateEmployeeDto) {
     const updated = await this.employeeService.updateByAdmin(id, body);
+    await this.bumpCacheVersion();
     return ResponseBuilder.createResponse({
       statusCode: 200,
       message: 'Employee updated successfully',
@@ -117,6 +132,7 @@ export class EmployeeController {
     if (!employee) throw new NotFoundException('Employee not found');
     
     const updatedEmployee = await this.employeeService.update(req.user.email, updateProfileDto);
+    await this.bumpCacheVersion();
     return plainToInstance(EmployeeDto, updatedEmployee, { excludeExtraneousValues: true });
   }
 
@@ -207,17 +223,19 @@ export class EmployeeController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get('department')
   async getEmployeesByManger(@Request() req) {
-    
-    const employee = await this.employeeService.findOneByEmail(req.user.email);
-    if (!employee || !employee.department) {
-      throw new NotFoundException('Department not found for the manager');
-    }
-    
-    const departmentEmployees = await this.employeeService.findByDepartment(employee.department.name);
-    return ResponseBuilder.createResponse({
-      statusCode: 200,
-      message: 'Employees retrieved successfully',
-      data: plainToInstance(EmployeeDto, departmentEmployees, { excludeExtraneousValues: true }),
+    const requester = String(req.user.id || req.user.email || 'unknown');
+    return this.getOrSetCache('department', requester, async () => {
+      const employee = await this.employeeService.findOneByEmail(req.user.email);
+      if (!employee || !employee.department) {
+        throw new NotFoundException('Department not found for the manager');
+      }
+      
+      const departmentEmployees = await this.employeeService.findByDepartment(employee.department.name);
+      return ResponseBuilder.createResponse({
+        statusCode: 200,
+        message: 'Employees retrieved successfully',
+        data: plainToInstance(EmployeeDto, departmentEmployees, { excludeExtraneousValues: true }),
+      });
     });
   }
 
@@ -227,21 +245,25 @@ export class EmployeeController {
   @ApiResponse({ status: 200, description: 'The employee profile.', type: EmployeeDto })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   async getEmployeeById(@Param('id') id: string, @Request() req) {
-    const user = await this.employeeService.findOneByEmail(req.user.email);
-    if (user.roles === ROLE.MANAGER) {
-      if (!user.department) {
-        throw new NotFoundException('Department not found for the manager');
+    const requester = String(req.user.id || req.user.email || 'unknown');
+    const key = `${requester}:${id}`;
+    return this.getOrSetCache('by-id', key, async () => {
+      const user = await this.employeeService.findOneByEmail(req.user.email);
+      if (user.roles === ROLE.MANAGER) {
+        if (!user.department) {
+          throw new NotFoundException('Department not found for the manager');
+        }
+        const targetEmployee = await this.employeeService.findById(id);
+        if (targetEmployee.department?.id !== user.department.id) {
+          throw new NotFoundException('Employee not found in your department');
+        }
       }
-      const targetEmployee = await this.employeeService.findById(id);   
-      if (targetEmployee.department?.id !== user.department.id) {
-        throw new NotFoundException('Employee not found in your department');
-      }
-    }
-    const employee = await this.employeeService.findById(id);
-    return ResponseBuilder.createResponse({
-      statusCode: 200,
-      message: 'Employee retrieved successfully',
-      data: plainToInstance(EmployeeDto, employee, { excludeExtraneousValues: true }),
+      const employee = await this.employeeService.findById(id);
+      return ResponseBuilder.createResponse({
+        statusCode: 200,
+        message: 'Employee retrieved successfully',
+        data: plainToInstance(EmployeeDto, employee, { excludeExtraneousValues: true }),
+      });
     });
   }
 
@@ -256,10 +278,58 @@ export class EmployeeController {
   @ApiResponse({ status: 404, description: 'Employee not found.' })
   async deleteEmployeeById(@Param('id') id: string) {
     await this.employeeService.softDeleteById(id);
+    await this.bumpCacheVersion();
     return ResponseBuilder.createResponse({
       statusCode: 200,
       message: 'Employee deleted successfully',
       data: null,
     });
+  }
+
+  private async getOrSetCache<T>(
+    scope: string,
+    suffix: string,
+    factory: () => Promise<T>,
+  ): Promise<T> {
+    const version = await this.getCacheVersion();
+    const key = `employee:${scope}:v${version}:${suffix}`;
+    const cached = await this.cacheManager.get<T>(key);
+
+    if (cached !== undefined && cached !== null) {
+      return cached;
+    }
+
+    const fresh = await factory();
+    await this.cacheManager.set(key, fresh, this.cacheTtl);
+    return fresh;
+  }
+
+  private async getCacheVersion(): Promise<number> {
+    const value = await this.cacheManager.get<number>(this.cacheVersionKey);
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+      return value;
+    }
+
+    await this.cacheManager.set(this.cacheVersionKey, 1);
+    return 1;
+  }
+
+  private async bumpCacheVersion(): Promise<void> {
+    const version = await this.getCacheVersion();
+    await this.cacheManager.set(this.cacheVersionKey, version + 1);
+  }
+
+  private serializeQuery(query: QueryEmployeeDto): string {
+    const normalized = Object.keys(query || {})
+      .sort()
+      .reduce((result, key) => {
+        const value = (query as Record<string, unknown>)[key];
+        if (value !== undefined && value !== null && value !== '') {
+          result[key] = value;
+        }
+        return result;
+      }, {} as Record<string, unknown>);
+
+    return JSON.stringify(normalized);
   }
 }
