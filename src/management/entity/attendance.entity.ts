@@ -1,8 +1,10 @@
 
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, Index, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
 import { Employee } from "../../auth/entity/employee.entity";
 
 @Entity()
+@Index('idx_attendance_time_in', ['TimeIn'])
+@Index('idx_attendance_employee_time_in', ['employee', 'TimeIn'])
 export class Attendance {
     @PrimaryGeneratedColumn('uuid')
     id: string;  

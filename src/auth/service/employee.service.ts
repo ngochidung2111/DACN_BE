@@ -180,6 +180,19 @@ export class EmployeeService {
     await this.employeeRepository.softRemove(employee);
   }
 
+  async changePassword(id: string, newPassword: string): Promise<void> {
+    const employee = await this.findById(id);
+    employee.password_hash = await bcrypt.hash(newPassword, 10);
+    employee.tokenVersion = (employee.tokenVersion ?? 0) + 1;
+    await this.employeeRepository.save(employee);
+  }
+
+  async logout(id: string): Promise<void> {
+    const employee = await this.findById(id);
+    employee.tokenVersion = (employee.tokenVersion ?? 0) + 1;
+    await this.employeeRepository.save(employee);
+  }
+
   private async updateDegrees(employee: Employee, degrees: DegreeInputDto[]): Promise<void> {
     if (!degrees || degrees.length === 0) {
       return;

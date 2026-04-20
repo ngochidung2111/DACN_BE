@@ -8,12 +8,15 @@ import { plainToInstance } from 'class-transformer';
 import { LeaveRequestDto } from '../dto/leave-request';
 import { EMPLOYEE_SCHEDULE_ITEM_TYPE, EmployeeScheduleItemDto } from '../dto';
 import { EmployeeService } from '../../auth/service/employee.service';
+import { Notification } from '../entity/notification.entity';
 
 @Injectable()
 export class LeaveRequestService {
   constructor(
     @InjectRepository(LeaveRequest)
     private readonly leaveRequestRepository: Repository<LeaveRequest>,
+    @InjectRepository(Notification)
+    private readonly notificationRepository: Repository<Notification>,
     private readonly employeeService: EmployeeService,
   ) {}
 
@@ -423,6 +426,22 @@ export class LeaveRequestService {
       leaveRequest.description = dto.description;
     }
 
-    return this.leaveRequestRepository.save(leaveRequest);
+    const savedLeaveRequest = await this.leaveRequestRepository.save(leaveRequest);
+
+    if (savedLeaveRequest.employee) {
+      const notification = this.notificationRepository.create({
+        employee: savedLeaveRequest.employee,
+        message: `Your leave request from ${savedLeaveRequest.date_from.toISOString().slice(0, 10)} to ${savedLeaveRequest.date_to
+          .toISOString()
+          .slice(0, 10)} is ${savedLeaveRequest.status}.`,
+        type: 'LEAVE_REQUEST',
+        status: 'UNREAD',
+        created_at: new Date(),
+      });
+
+      await this.notificationRepository.save(notification);
+    }
+
+    return savedLeaveRequest;
   }
 }
