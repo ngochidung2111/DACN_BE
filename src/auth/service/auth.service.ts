@@ -1,6 +1,6 @@
 import * as bcrypt from 'bcrypt';
 
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 
 import { LoginRequestDto } from '../dto/login.dto';
@@ -34,7 +34,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const payload = { sub: user.id, email: user.email , roles: user.roles };
+    const payload = { sub: user.id, email: user.email, roles: user.roles, tokenVersion: user.tokenVersion ?? 0 };
     const accessToken = this.jwtService.sign(payload, { expiresIn: this.configService.get('auth.jwtExpiresIn') });
     const refreshToken = this.jwtService.sign(payload, { expiresIn: this.configService.get('auth.refreshTokenExpiresIn') });
 
@@ -53,8 +53,12 @@ export class AuthService {
         throw new UnauthorizedException('Invalid refresh token');
       }
 
+      if ((payload.tokenVersion ?? 0) !== (user.tokenVersion ?? 0)) {
+        throw new UnauthorizedException('Token has been revoked');
+      }
+
       const newAccessToken = this.jwtService.sign(
-        { sub: user.id, email: user.email , roles: user.roles},
+        { sub: user.id, email: user.email, roles: user.roles, tokenVersion: user.tokenVersion ?? 0 },
         { expiresIn: '15m' },
       );
 
@@ -62,5 +66,20 @@ export class AuthService {
     } catch (error) {
       throw new UnauthorizedException('Invalid refresh token');
     }
+  }
+
+  async changePassword(userId: string, newPassword: string) {
+    if (!newPassword || newPassword.trim().length < 6) {
+      throw new BadRequestException('New password must be at least 6 characters long');
+    }
+
+    await this.employeeService.changePassword(userId, newPassword);
+
+    return { success: true };
+  }
+
+  async logout(userId: string) {
+    await this.employeeService.logout(userId);
+    return { success: true };
   }
 }

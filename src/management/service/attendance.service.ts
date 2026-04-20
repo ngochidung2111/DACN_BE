@@ -212,24 +212,18 @@ export class AttendanceService {
 
         const employees = await this.employeeService.findByDepartmentId(departmentId);
 
-        const attendances = await this.attendanceRepository
+        const workedRows = await this.attendanceRepository
             .createQueryBuilder('attendance')
-            .leftJoinAndSelect('attendance.employee', 'employee')
-            .leftJoin('employee.department', 'department')
+            .select('employee.id', 'employeeId')
+            .distinct(true)
+            .innerJoin('attendance.employee', 'employee')
+            .innerJoin('employee.department', 'department')
             .where('department.id = :departmentId', { departmentId })
             .andWhere('attendance.TimeIn >= :dayStart', { dayStart })
             .andWhere('attendance.TimeIn < :dayEnd', { dayEnd })
-            .orderBy('attendance.TimeIn', 'DESC')
-            .getMany();
+            .getRawMany<{ employeeId: string }>();
 
-        const workedEmployeeIds = new Set<string>();
-
-        for (const attendance of attendances) {
-            const employeeIdValue = attendance.employee?.id;
-            if (employeeIdValue) {
-                workedEmployeeIds.add(employeeIdValue);
-            }
-        }
+        const workedEmployeeIds = new Set<string>(workedRows.map((row) => row.employeeId));
 
         const employeeStatuses = employees.map((employee) => {
             return {

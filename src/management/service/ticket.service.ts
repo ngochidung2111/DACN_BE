@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Repository } from 'typeorm';
 
 
 
@@ -30,6 +30,7 @@ import { ROLE } from '../entity/constants';
 import { plainToInstance } from 'class-transformer';
 import { Employee } from '../../auth/entity/employee.entity';
 import { Department } from '../../auth/entity/department.entity';
+import { Notification } from '../entity/notification.entity';
 
 @Injectable()
 export class TicketService {
@@ -44,6 +45,8 @@ export class TicketService {
     private readonly departmentRepository: Repository<Department>,
     @InjectRepository(Employee)
     private readonly employeeRepository: Repository<Employee>,
+    @InjectRepository(Notification)
+    private readonly notificationRepository: Repository<Notification>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -245,14 +248,13 @@ export class TicketService {
 
       const ticket = await queryRunner.manager.findOne(Ticket, {
         where: { id: ticketId },
-        relations: ['assignee'],
+        relations: ['assignee', 'employee'],
       });
 
       if (!ticket) {
         throw new NotFoundException(`Ticket with ID ${ticketId} not found`);
       }
 
-      const oldAssignee = ticket.assignee;
       ticket.assignee = assignee;
       ticket.updated_at = new Date();
 
@@ -269,6 +271,12 @@ export class TicketService {
       });
 
       await queryRunner.manager.save(process);
+      await this.createNotificationWithManager(
+        queryRunner.manager,
+        ticket.employee,
+        'TICKET',
+        `Ticket "${savedTicket.title}" was assigned to ${assignee.firstName} ${assignee.lastName}.`,
+      );
       await queryRunner.commitTransaction();
 
       return this.getTicketById(ticketId);
@@ -420,6 +428,12 @@ export class TicketService {
       });
 
       await queryRunner.manager.save(process);
+      await this.createNotificationWithManager(
+        queryRunner.manager,
+        ticket.employee,
+        'TICKET',
+        `Ticket "${savedTicket.title}" was assigned to ${assignee.firstName} ${assignee.lastName}.`,
+      );
       await queryRunner.commitTransaction();
 
       return this.getTicketById(ticketId);
@@ -448,6 +462,7 @@ export class TicketService {
 
       const ticket = await queryRunner.manager.findOne(Ticket, {
         where: { id: ticketId },
+        relations: ['employee'],
       });
 
       if (!ticket) {
@@ -472,6 +487,12 @@ export class TicketService {
       });
 
       await queryRunner.manager.save(process);
+      await this.createNotificationWithManager(
+        queryRunner.manager,
+        ticket.employee,
+        'TICKET',
+        `Ticket "${savedTicket.title}" status changed from ${fromStatus} to ${dto.status}.`,
+      );
       await queryRunner.commitTransaction();
 
       return this.getTicketById(ticketId);
@@ -519,6 +540,14 @@ export class TicketService {
     });
 
     const savedProcess = await this.ticketProcessRepository.save(process);
+
+    if (ticket.employee && ticket.employee.id !== actorId) {
+      await this.createNotification(
+        ticket.employee,
+        'TICKET',
+        `A new update was added to ticket "${ticket.title}" by ${actor.firstName} ${actor.lastName}.`,
+      );
+    }
 
     const hydratedProcess = await this.ticketProcessRepository.findOne({
       where: { id: savedProcess.id },
@@ -667,6 +696,43 @@ export class TicketService {
     }
 
     return category;
+  }
+
+  private async createNotification(employee: Employee, type: string, message: string): Promise<void> {
+    if (!employee?.id) {
+      return;
+    }
+
+    const notification = this.notificationRepository.create({
+      employee,
+      message,
+      type,
+      status: 'UNREAD',
+      created_at: new Date(),
+    });
+
+    await this.notificationRepository.save(notification);
+  }
+
+  private async createNotificationWithManager(
+    manager: EntityManager,
+    employee: Employee,
+    type: string,
+    message: string,
+  ): Promise<void> {
+    if (!employee?.id) {
+      return;
+    }
+
+    const notification = manager.create(Notification, {
+      employee,
+      message,
+      type,
+      status: 'UNREAD',
+      created_at: new Date(),
+    });
+
+    await manager.save(notification);
   }
 
   async createTicketCategory(dto: CreateTicketCategoryDto): Promise<TicketCategory> {

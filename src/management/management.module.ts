@@ -11,6 +11,7 @@ import { AssetController } from './controller/asset.controller';
 import { TicketController } from './controller/ticket.controller';
 import { ReportController } from './controller/report.controller';
 import { AnnouncementController } from './controller/announcement.controller';
+import { NotificationController } from './controller/notification.controller';
 import { ManagementService } from './service/management.service';
 import { BookingService } from './service/booking.service';
 import { RoomService } from './service/room.service';
@@ -21,6 +22,7 @@ import { AssetService } from './service/asset.service';
 import { TicketService } from './service/ticket.service';
 import { ReportService } from './service/report.service';
 import { AnnouncementService } from './service/announcement.service';
+import { NotificationService } from './service/notification.service';
 import { RoomStatusScheduler } from './service/room-status.scheduler';
 import { Booking } from './entity/booking.entity';
 import { Room } from './entity/room.entity';
@@ -35,6 +37,7 @@ import { Ticket } from './entity/ticket.entity';
 import { Report } from './entity/report.entity';
 import { TicketProcess } from './entity/ticket-process.entity';
 import { TicketCategory } from './entity/ticket-category.entity';
+import { Notification } from './entity/notification.entity';
 import { AuthModule } from '../auth/auth.module';
 import { SharedModule } from '../shared/shared.module';
 import { Employee } from '../auth/entity/employee.entity';
@@ -56,6 +59,7 @@ import { Department } from '../auth/entity/department.entity';
       Report,
       TicketProcess,
       TicketCategory,
+      Notification,
       Employee,
       Department,
     ]),
@@ -66,6 +70,7 @@ import { Department } from '../auth/entity/department.entity';
   controllers: [
     ManagementController,
     AnnouncementController,
+    NotificationController,
     BookingController,
     RoomController,
     AttendanceController,
@@ -79,6 +84,7 @@ import { Department } from '../auth/entity/department.entity';
   providers: [
     ManagementService,
     AnnouncementService,
+    NotificationService,
     BookingService,
     RoomService,
     AttendanceService,

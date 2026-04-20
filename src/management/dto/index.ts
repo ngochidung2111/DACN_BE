@@ -27,3 +27,6 @@ export * from './schedule/employee-schedule-item.dto';
 
 // Announcement DTOs
 export * from './announcement';
+
+// Notification DTOs
+export * from './notification';
