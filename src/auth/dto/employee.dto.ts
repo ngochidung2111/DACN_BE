@@ -187,14 +187,14 @@ export class EmployeeDto {
     @Expose()
     childrenDescription?: string;
 
-    @ApiProperty({
-        description: 'Department of the employee',
-        example: 'Sales',
-        required: false,
-    })
-    @Expose()
-    @Type(() => DepartmentDto)
-    department?: DepartmentDto;
+    // @ApiProperty({
+    //     description: 'Department of the employee',
+    //     example: 'Sales',
+    //     required: false,
+    // })
+    // @Expose()
+    // @Type(() => DepartmentDto)
+    // department?: DepartmentDto;
 
     @ApiProperty({ description: 'Employee degrees', required: false, type: () => [DegreeDto] })
     @Expose()

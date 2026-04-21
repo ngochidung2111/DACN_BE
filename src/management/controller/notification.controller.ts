@@ -1,5 +1,5 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Controller, Get, Inject, Query, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Inject, Patch, Query, Request, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Cache } from 'cache-manager';
@@ -39,6 +39,22 @@ export class NotificationController {
     });
   }
 
+  @ApiOperation({ summary: 'Mark all unread notifications as read for current user' })
+  @ApiResponse({ status: 200, description: 'Notifications marked as read successfully' })
+  @Patch('my/read-all')
+  async markAllMyNotificationsAsRead(@Request() req) {
+    const affected = await this.notificationService.markAllMyNotificationsAsRead(req.user.userId);
+    await this.bumpCacheVersion();
+
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'Notifications marked as read successfully',
+      data: {
+        affected,
+      },
+    });
+  }
+
   private async getOrSetCache<T>(scope: string, suffix: string, factory: () => Promise<T>): Promise<T> {
     const version = await this.getCacheVersion();
     const key = `notification:${scope}:v${version}:${suffix}`;
@@ -61,6 +77,11 @@ export class NotificationController {
 
     await this.cacheManager.set(this.cacheVersionKey, 1);
     return 1;
+  }
+
+  private async bumpCacheVersion(): Promise<void> {
+    const version = await this.getCacheVersion();
+    await this.cacheManager.set(this.cacheVersionKey, version + 1);
   }
 
   private serializeQuery(query: Record<string, unknown>): string {

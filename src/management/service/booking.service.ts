@@ -11,6 +11,7 @@ import { BookingResponseShortDto } from '../dto/booking';
 import { EMPLOYEE_SCHEDULE_ITEM_TYPE, EmployeeScheduleItemDto } from '../dto';
 import { EmployeeService } from '../../auth/service/employee.service';
 import { Employee } from '../../auth/entity/employee.entity';
+import { Notification } from '../entity/notification.entity';
 
 @Injectable()
 export class BookingService {
@@ -19,6 +20,8 @@ export class BookingService {
     private bookingRepository: Repository<Booking>,
     @InjectRepository(Room)
     private roomRepository: Repository<Room>,
+    @InjectRepository(Notification)
+    private notificationRepository: Repository<Notification>,
 
     private employeeService: EmployeeService,
   ) {}
@@ -95,6 +98,7 @@ export class BookingService {
         purpose,
         attendees,
       );
+      await this.notifyAttendeesAboutBooking(booking, attendees);
       return plainToInstance(BookingResponseDto, booking, {
         excludeExtraneousValues: true,
       });
@@ -121,6 +125,7 @@ export class BookingService {
       recurring_pattern as BOOKING_PATTERN,
       recurringEndDate,
     );
+    await this.notifyAttendeesAboutRecurringBookings(bookings, attendees);
     return plainToInstance(BookingResponseDto, bookings, {
       excludeExtraneousValues: true,
     });
@@ -315,7 +320,15 @@ export class BookingService {
     }
 
     if (updateBookingDto.attendee_ids !== undefined) {
-      booking.attendees = await this.resolveAttendees(updateBookingDto.attendee_ids);
+      const previousAttendeeIds = new Set((booking.attendees ?? []).map((attendee) => attendee.id));
+      const nextAttendees = await this.resolveAttendees(updateBookingDto.attendee_ids);
+      booking.attendees = nextAttendees;
+
+      const addedAttendees = nextAttendees.filter((attendee) => !previousAttendeeIds.has(attendee.id));
+
+      const updatedBooking = await this.bookingRepository.save(booking);
+      await this.notifyAttendeesAboutBooking(updatedBooking, addedAttendees);
+      return this.toBookingResponseDto(updatedBooking);
     }
 
     const updatedBooking = await this.bookingRepository.save(booking);
@@ -335,6 +348,7 @@ export class BookingService {
 
     booking.attendees = mergedAttendees;
     const updatedBooking = await this.bookingRepository.save(booking);
+    await this.notifyAttendeesAboutBooking(updatedBooking, attendeesToAdd.filter((attendee) => !existingIds.has(attendee.id)));
     return this.toBookingResponseDto(updatedBooking);
   }
 
@@ -580,6 +594,61 @@ export class BookingService {
     );
 
     return attendees;
+  }
+
+  private async notifyAttendeesAboutBooking(booking: Booking, attendees: Employee[]): Promise<void> {
+    if (!booking?.id || attendees.length === 0) {
+      return;
+    }
+
+    const uniqueAttendees = attendees.filter(
+      (attendee, index, list) => list.findIndex((item) => item.id === attendee.id) === index,
+    );
+
+    await Promise.all(
+      uniqueAttendees
+        .filter((attendee) => attendee.id !== booking.employee?.id)
+        .map((attendee) =>
+          this.notificationRepository.save(
+            this.notificationRepository.create({
+              employee: attendee,
+              message: `You have been added to booking "${booking.purpose}" in room ${booking.room?.name ?? 'Unknown'} from ${booking.start_time.toISOString()} to ${booking.end_time.toISOString()}.`,
+              type: 'BOOKING',
+              status: 'UNREAD',
+              created_at: new Date(),
+            }),
+          ),
+        ),
+    );
+  }
+
+  private async notifyAttendeesAboutRecurringBookings(bookings: Booking[], attendees: Employee[]): Promise<void> {
+    if (bookings.length === 0 || attendees.length === 0) {
+      return;
+    }
+
+    const notifications: Notification[] = [];
+    for (const booking of bookings) {
+      for (const attendee of attendees) {
+        if (attendee.id === booking.employee?.id) {
+          continue;
+        }
+
+        notifications.push(
+          this.notificationRepository.create({
+            employee: attendee,
+            message: `You have been added to recurring booking "${booking.purpose}" in room ${booking.room?.name ?? 'Unknown'} from ${booking.start_time.toISOString()} to ${booking.end_time.toISOString()}.`,
+            type: 'BOOKING',
+            status: 'UNREAD',
+            created_at: new Date(),
+          }),
+        );
+      }
+    }
+
+    if (notifications.length > 0) {
+      await this.notificationRepository.save(notifications);
+    }
   }
 
   private toBookingResponseDto(booking: Booking): BookingResponseDto {
