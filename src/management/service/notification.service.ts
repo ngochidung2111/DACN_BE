@@ -52,4 +52,18 @@ export class NotificationService {
       pageSize,
     };
   }
+
+  async markAllMyNotificationsAsRead(employeeId: string): Promise<number> {
+    await this.employeeService.findById(employeeId);
+
+    const result = await this.notificationRepository
+      .createQueryBuilder()
+      .update(Notification)
+      .set({ status: 'READ' })
+      .where('employee_id = :employeeId', { employeeId })
+      .andWhere('status = :unread', { unread: 'UNREAD' })
+      .execute();
+
+    return result.affected ?? 0;
+  }
 }

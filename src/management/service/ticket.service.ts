@@ -110,10 +110,7 @@ export class TicketService {
       .createQueryBuilder('ticket')
       .leftJoinAndSelect('ticket.employee', 'employee')
       .leftJoinAndSelect('ticket.assignee', 'assignee')
-      .leftJoinAndSelect('ticket.category', 'category')
-      .leftJoinAndSelect('ticket.processes', 'processes')
-      .leftJoinAndSelect('processes.actor', 'process_actor')
-      .leftJoinAndSelect('processes.assignee', 'process_assignee');
+      .leftJoinAndSelect('ticket.category', 'category');
 
     if (query.status) {
       qb.andWhere('ticket.status = :status', { status: query.status });

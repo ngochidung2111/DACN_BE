@@ -163,7 +163,7 @@ export class EmployeeService {
   async findByDepartmentId(departmentId: string): Promise<Employee[]> {
     return await this.employeeRepository.find({
       where: { department: { id: departmentId } },
-      relations: ['department', 'degrees'],
+      relations: ['department'],
       order: { firstName: 'ASC', middleName: 'ASC', lastName: 'ASC' },
     });
   }
