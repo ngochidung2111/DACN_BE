@@ -86,6 +86,23 @@ export class TicketService {
       });
 
       await queryRunner.manager.save(process);
+
+      const departmentManagers = await this.findDepartmentManagers(
+        queryRunner.manager,
+        category.departments.map((department) => department.id),
+      );
+
+      await Promise.all(
+        departmentManagers.map((manager) =>
+          this.createNotificationWithManager(
+            queryRunner.manager,
+            manager,
+            'TICKET',
+            `Thẻ hỗ trợ "${savedTicket.title}" đã được tạo, vui lòng kiểm tra.`,
+          ),
+        ),
+      );
+
       await queryRunner.commitTransaction();
 
       return this.getTicketById(savedTicket.id);
@@ -730,6 +747,23 @@ export class TicketService {
     });
 
     await manager.save(notification);
+  }
+
+  private async findDepartmentManagers(
+    manager: EntityManager,
+    departmentIds: string[],
+  ): Promise<Employee[]> {
+    if (!departmentIds.length) {
+      return [];
+    }
+
+    return manager
+      .getRepository(Employee)
+      .createQueryBuilder('employee')
+      .leftJoinAndSelect('employee.department', 'department')
+      .where('department.id IN (:...departmentIds)', { departmentIds })
+      .andWhere('employee.roles = :role', { role: ROLE.MANAGER })
+      .getMany();
   }
 
   async createTicketCategory(dto: CreateTicketCategoryDto): Promise<TicketCategory> {

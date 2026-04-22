@@ -54,4 +54,8 @@ export class ChatHistoryService {
   async clearSession(userId: string, sessionId: string): Promise<void> {
     await this.chatHistoryRepository.delete({ userId, sessionId });
   }
+
+  async clearAllSessions(userId: string): Promise<void> {
+    await this.chatHistoryRepository.delete({ userId });
+  }
 }

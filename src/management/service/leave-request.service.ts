@@ -8,6 +8,7 @@ import { plainToInstance } from 'class-transformer';
 import { LeaveRequestDto } from '../dto/leave-request';
 import { EMPLOYEE_SCHEDULE_ITEM_TYPE, EmployeeScheduleItemDto } from '../dto';
 import { EmployeeService } from '../../auth/service/employee.service';
+import { Employee } from '../../auth/entity/employee.entity';
 import { Notification } from '../entity/notification.entity';
 
 @Injectable()
@@ -42,7 +43,38 @@ export class LeaveRequestService {
       description: dto.description ?? '',
     });
 
-    return this.leaveRequestRepository.save(leaveRequest);
+    const savedLeaveRequest = await this.leaveRequestRepository.save(leaveRequest);
+
+    const managers = await this.findDepartmentManagers(employeeId);
+    if (managers.length > 0) {
+      const message = `${employee.firstName} ${employee.lastName} submitted a leave request from ${savedLeaveRequest.date_from
+        .toISOString()
+        .slice(0, 10)} to ${savedLeaveRequest.date_to.toISOString().slice(0, 10)}.`;
+
+      const notifications = managers.map((manager) =>
+        this.notificationRepository.create({
+          employee: manager,
+          message,
+          type: 'LEAVE_REQUEST',
+          status: 'UNREAD',
+          created_at: new Date(),
+        }));
+
+      await this.notificationRepository.save(notifications);
+    }
+
+    return savedLeaveRequest;
+  }
+
+  private async findDepartmentManagers(employeeId: string): Promise<Employee[]> {
+    return this.leaveRequestRepository.manager
+      .getRepository(Employee)
+      .createQueryBuilder('manager')
+      .innerJoin('manager.department', 'department')
+      .innerJoin('department.employees', 'member', 'member.id = :employeeId', { employeeId })
+      .where('manager.roles = :role', { role: ROLE.MANAGER })
+      .andWhere('manager.id != :employeeId', { employeeId })
+      .getMany();
   }
 
   async getMyLeaveRequests(employeeId: string, query: QueryLeaveRequestDto) {
