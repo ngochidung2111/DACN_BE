@@ -63,6 +63,8 @@ export class AssetController {
   @ApiQuery({ name: 'condition', required: false, enum: Object.values(ASSET_CONDITION) })
   @ApiQuery({ name: 'ownerEmployeeId', required: false })
   @ApiQuery({ name: 'location', required: false })
+  @ApiQuery({ name: 'assetTag', required: false })
+  @ApiQuery({ name: 'serialNumber', required: false })
   @ApiQuery({ name: 'keyword', required: false })
   @ApiResponse({ status: 200, description: 'Asset list' })
   @UseGuards(AuthGuard('jwt'), RolesGuard)

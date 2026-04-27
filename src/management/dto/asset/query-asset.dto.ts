@@ -39,6 +39,16 @@ export class QueryAssetDto {
   @IsString()
   location?: string;
 
+  @ApiPropertyOptional({ description: 'Filter by asset tag', example: 'ASSET-IT-0001' })
+  @IsOptional()
+  @IsString()
+  assetTag?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by serial number', example: 'SN-MBP16-M3-2026-0001' })
+  @IsOptional()
+  @IsString()
+  serialNumber?: string;
+
   @ApiPropertyOptional({ description: 'Search by asset name', example: 'MacBook' })
   @IsOptional()
   @IsString()

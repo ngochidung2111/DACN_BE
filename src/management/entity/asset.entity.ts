@@ -13,6 +13,12 @@ export class Asset {
   @Column()
   name: string;
 
+  @Column({ type: 'varchar', length: 100, nullable: true, unique: true, name: 'asset_tag' })
+  assetTag?: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true, unique: true, name: 'serial_number' })
+  serialNumber?: string | null;
+
   @Column()
   type: ASSET_TYPE;
 

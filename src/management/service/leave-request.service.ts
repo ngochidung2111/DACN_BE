@@ -458,7 +458,30 @@ export class LeaveRequestService {
       leaveRequest.description = dto.description;
     }
 
-    const savedLeaveRequest = await this.leaveRequestRepository.save(leaveRequest);
+    const savedLeaveRequest = await this.leaveRequestRepository.manager.transaction(async (manager) => {
+      const saved = await manager.getRepository(LeaveRequest).save(leaveRequest);
+
+      if (dto.status === LEAVE_REQUEST_STATUS.APPROVED) {
+        const requestedDays = this.calculateRequestedLeaveDays(saved.date_from, saved.date_to);
+        const employee = leaveRequest.employee;
+
+        if (!employee) {
+          throw new NotFoundException('Employee not found for leave request');
+        }
+
+        const currentLeaveBalance = employee.leaveBalance ?? 0;
+        if (currentLeaveBalance < requestedDays) {
+          throw new BadRequestException(
+            `Insufficient leave balance. Requested ${requestedDays} day(s), available ${currentLeaveBalance} day(s).`,
+          );
+        }
+
+        employee.leaveBalance = currentLeaveBalance - requestedDays;
+        await manager.getRepository(Employee).save(employee);
+      }
+
+      return saved;
+    });
 
     if (savedLeaveRequest.employee) {
       const notification = this.notificationRepository.create({
@@ -475,5 +498,22 @@ export class LeaveRequestService {
     }
 
     return savedLeaveRequest;
+  }
+
+  private calculateRequestedLeaveDays(dateFrom: Date, dateTo: Date): number {
+    const start = new Date(dateFrom);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(dateTo);
+    end.setHours(0, 0, 0, 0);
+
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const diffDays = Math.floor((end.getTime() - start.getTime()) / msPerDay) + 1;
+
+    if (diffDays <= 0) {
+      throw new BadRequestException('Invalid leave date range');
+    }
+
+    return diffDays;
   }
 }

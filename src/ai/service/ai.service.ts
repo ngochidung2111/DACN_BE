@@ -22,7 +22,6 @@ type ChatParams = {
   email?: string;
   roles?: string[] | string;
   message: string;
-  sessionId?: string;
 };
 
 @Injectable()
@@ -43,7 +42,7 @@ export class AiService {
   ) {}
 
   async chat(params: ChatParams): Promise<ChatResponseDto> {
-    const sessionId = params.sessionId?.trim() || params.userId;
+    const sessionId = await this.resolveEmployeeSessionId(params.userId);
     const normalizedRoles = this.normalizeRoles(params.roles);
 
     if (this.isRestrictedSystemStatsQuestion(params.message) && !this.hasRole(normalizedRoles, ROLE.ADMIN)) {
@@ -134,6 +133,7 @@ export class AiService {
               email: employee.email,
               firstName: employee.firstName,
               middleName: employee.middleName,
+              leaveBalance: employee.leaveBalance,
               lastName: employee.lastName,
               phone: employee.phone,
               address: employee.address,
@@ -556,11 +556,10 @@ export class AiService {
       new DynamicTool({
         name: 'get_chat_history',
         description:
-          'Get recent chat history of current user in a session. Input JSON supports optional session_id and limit (max 20).',
+          'Get recent chat history of current employee session. Input JSON supports optional limit (max 20).',
         func: async (input: string) => {
           const payload = this.parseJsonInput(input);
-          const sessionId =
-            this.readOptionalString(payload.session_id) || params.sessionId?.trim() || params.userId;
+          const sessionId = await this.resolveEmployeeSessionId(params.userId);
           const limit = this.readSafeLimit(payload.limit, 10, 20);
 
           const history = await this.chatHistoryService.getSessionHistory(
@@ -586,11 +585,10 @@ export class AiService {
       new DynamicTool({
         name: 'clear_chat_history',
         description:
-          'Clear current user chat history in a session. Input JSON supports optional session_id. Returns deleted confirmation.',
+          'Clear current employee chat history session. Returns deleted confirmation.',
         func: async (input: string) => {
-          const payload = this.parseJsonInput(input);
-          const sessionId =
-            this.readOptionalString(payload.session_id) || params.sessionId?.trim() || params.userId;
+          this.parseJsonInput(input);
+          const sessionId = await this.resolveEmployeeSessionId(params.userId);
 
           await this.chatHistoryService.clearSession(params.userId, sessionId);
 
@@ -736,7 +734,7 @@ export class AiService {
         userId: params.userId,
         email: params.email || 'unknown',
         roles: this.normalizeRoles(params.roles),
-        sessionId: sessionId || params.sessionId || '',
+        sessionId: sessionId || '',
       });
       const historyMessages = this.mapHistoryToMessages(history);
 
@@ -964,6 +962,11 @@ export class AiService {
     return this.ticketService.getTicketCategories({
       department_id: employee.department.id,
     });
+  }
+
+  private async resolveEmployeeSessionId(userId: string): Promise<string> {
+    const employee = await this.employeeService.findById(userId);
+    return employee.id;
   }
 
   private async getActiveTicketCategories() {

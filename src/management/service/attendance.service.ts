@@ -3,9 +3,10 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { IsNull, Repository } from "typeorm";
 
 import { Attendance } from "../entity/attendance.entity";
+import { LeaveRequest } from "../entity/leave-request.entity";
 import { QueryAttendanceDto } from "../dto/attendance";
 import { DepartmentAttendanceEmployeeDto, DepartmentAttendanceSummaryResponseDto } from "../dto/attendance";
-import { ROLE } from "../entity/constants";
+import { LEAVE_REQUEST_STATUS, ROLE } from "../entity/constants";
 import { EmployeeService } from "../../auth/service/employee.service";
 
 @Injectable()
@@ -15,6 +16,8 @@ export class AttendanceService {
     constructor(
         @InjectRepository(Attendance)
         private readonly attendanceRepository: Repository<Attendance>,
+        @InjectRepository(LeaveRequest)
+        private readonly leaveRequestRepository: Repository<LeaveRequest>,
         private readonly employeeService: EmployeeService,
     ) {}
 
@@ -290,7 +293,11 @@ export class AttendanceService {
             (Array.from(dailyWorkedMs.values()).reduce((sum, workedMs) => sum + workedMs, 0) / (60 * 60 * 1000)).toFixed(2)
         );
         const workedDays = enoughDays + lateDays;
-        const absentDays = Math.max(0, this.standardWorkingDays - workedDays);
+        const absentDays = await this.countApprovedLeaveDaysForEmployee(
+            employee.id,
+            periodStart,
+            periodEnd,
+        );
 
         return {
             year,
@@ -341,6 +348,12 @@ export class AttendanceService {
             .orderBy('attendance.TimeIn', 'ASC')
             .getMany();
 
+        const leaveDaysByEmployee = await this.getApprovedLeaveDayCountByEmployees(
+            employees.map((employee) => employee.id),
+            periodStart,
+            periodEnd,
+        );
+
         const attendanceMap = new Map<string, { timeIn: Date; timeOut: Date | null }>();
 
         for (const attendance of attendances) {
@@ -369,14 +382,13 @@ export class AttendanceService {
         const employeeSummaries: DepartmentAttendanceEmployeeDto[] = employees.map((employee) => {
             let onTimeDays = 0;
             let lateDays = 0;
-            let absentDays = 0;
+            const absentDays = leaveDaysByEmployee.get(employee.id) ?? 0;
+            totalAbsentDays += absentDays;
 
             for (const day of days) {
                 const attendance = attendanceMap.get(`${employee.id}:${day}`);
 
                 if (!attendance) {
-                    absentDays += 1;
-                    totalAbsentDays += 1;
                     continue;
                 }
 
@@ -445,5 +457,89 @@ export class AttendanceService {
         }
 
         return next > existing ? next : existing;
+    }
+
+    private toUtcDateOnly(date: Date): Date {
+        const value = new Date(date);
+        value.setUTCHours(0, 0, 0, 0);
+        return value;
+    }
+
+    private addUtcDays(date: Date, days: number): Date {
+        const value = new Date(date);
+        value.setUTCDate(value.getUTCDate() + days);
+        return value;
+    }
+
+    private async countApprovedLeaveDaysForEmployee(
+        employeeId: string,
+        periodStart: Date,
+        periodEnd: Date,
+    ): Promise<number> {
+        const leaveDaysByEmployee = await this.getApprovedLeaveDayCountByEmployees(
+            [employeeId],
+            periodStart,
+            periodEnd,
+        );
+
+        return leaveDaysByEmployee.get(employeeId) ?? 0;
+    }
+
+    private async getApprovedLeaveDayCountByEmployees(
+        employeeIds: string[],
+        periodStart: Date,
+        periodEnd: Date,
+    ): Promise<Map<string, number>> {
+        const result = new Map<string, number>();
+
+        if (employeeIds.length === 0) {
+            return result;
+        }
+
+        const leaveRequests = await this.leaveRequestRepository
+            .createQueryBuilder('leaveRequest')
+            .leftJoinAndSelect('leaveRequest.employee', 'employee')
+            .where('employee.id IN (:...employeeIds)', { employeeIds })
+            .andWhere('leaveRequest.status = :status', { status: LEAVE_REQUEST_STATUS.APPROVED })
+            .andWhere('leaveRequest.date_from < :periodEnd', { periodEnd })
+            .andWhere('leaveRequest.date_to >= :periodStart', { periodStart })
+            .getMany();
+
+        const periodStartDay = this.toUtcDateOnly(periodStart);
+        const periodEndDay = this.addUtcDays(this.toUtcDateOnly(periodEnd), -1);
+        const leaveDaySets = new Map<string, Set<string>>();
+
+        for (const leaveRequest of leaveRequests) {
+            const employeeId = leaveRequest.employee?.id;
+            if (!employeeId) {
+                continue;
+            }
+
+            const requestStart = this.toUtcDateOnly(leaveRequest.date_from);
+            const requestEnd = this.toUtcDateOnly(leaveRequest.date_to);
+            const overlapStart = requestStart > periodStartDay ? requestStart : periodStartDay;
+            const overlapEnd = requestEnd < periodEndDay ? requestEnd : periodEndDay;
+
+            if (overlapStart > overlapEnd) {
+                continue;
+            }
+
+            const days = leaveDaySets.get(employeeId) ?? new Set<string>();
+            for (
+                let current = overlapStart;
+                current <= overlapEnd;
+                current = this.addUtcDays(current, 1)
+            ) {
+                days.add(this.formatUtcDate(current));
+            }
+
+            leaveDaySets.set(employeeId, days);
+        }
+
+        for (const [employeeId, daySet] of leaveDaySets.entries()) {
+            result.set(employeeId, daySet.size);
+        }
+
+        return result;
     }
 }
