@@ -33,7 +33,6 @@ export class AiController {
       email: req.user.email,
       roles: req.user.roles,
       message: body.message,
-      sessionId: body.sessionId,
     });
 
     return ResponseBuilder.createResponse({

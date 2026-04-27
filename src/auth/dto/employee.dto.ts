@@ -187,6 +187,10 @@ export class EmployeeDto {
     @Expose()
     childrenDescription?: string;
 
+    @ApiProperty({ description: 'Remaining leave days', example: 12, required: false })
+    @Expose()
+    leaveBalance?: number;
+
     // @ApiProperty({
     //     description: 'Department of the employee',
     //     example: 'Sales',
@@ -305,6 +309,13 @@ export class UpdateProfileDto {
     @IsString()
     @IsOptional()
     childrenDescription?: string;
+
+    @ApiProperty({ description: 'Remaining leave days', example: 12, required: false })
+    @Expose()
+    @Type(() => Number)
+    @IsNumber()
+    @IsOptional()
+    leaveBalance?: number;
 
     @ApiProperty({ description: 'Employee degrees', required: false, type: () => [DegreeInputDto] })
     @Expose()
@@ -436,6 +447,13 @@ export class AdminUpdateEmployeeDto {
     @IsOptional()
     childrenDescription?: string;
 
+    @ApiProperty({ description: 'Remaining leave days', example: 12, required: false })
+    @Expose()
+    @Type(() => Number)
+    @IsNumber()
+    @IsOptional()
+    leaveBalance?: number;
+
     @ApiProperty({ description: 'Employee degrees', required: false, type: () => [DegreeInputDto] })
     @Expose()
     @Type(() => DegreeInputDto)
@@ -562,6 +580,13 @@ export class AdminCreateEmployeeDto {
     @IsString()
     @IsOptional()
     childrenDescription?: string;
+
+    @ApiProperty({ description: 'Remaining leave days', example: 12, required: false })
+    @Expose()
+    @Type(() => Number)
+    @IsNumber()
+    @IsOptional()
+    leaveBalance?: number;
 
     @ApiProperty({ description: 'Employee degrees', required: false, type: () => [DegreeInputDto] })
     @Expose()

@@ -41,6 +41,8 @@ export class AssetService {
 
     const asset = this.assetRepository.create({
       name: dto.name.trim(),
+      assetTag: dto.assetTag.trim(),
+      serialNumber: dto.serialNumber.trim(),
       type,
       owner,
       location,
@@ -77,8 +79,19 @@ export class AssetService {
       qb.andWhere('asset.location LIKE :location', { location: `%${query.location}%` });
     }
 
+    if (query.assetTag) {
+      qb.andWhere('asset.assetTag LIKE :assetTag', { assetTag: `%${query.assetTag}%` });
+    }
+
+    if (query.serialNumber) {
+      qb.andWhere('asset.serialNumber LIKE :serialNumber', { serialNumber: `%${query.serialNumber}%` });
+    }
+
     if (query.keyword) {
-      qb.andWhere('asset.name LIKE :keyword', { keyword: `%${query.keyword}%` });
+      qb.andWhere(
+        '(asset.name LIKE :keyword OR asset.assetTag LIKE :keyword OR asset.serialNumber LIKE :keyword)',
+        { keyword: `%${query.keyword}%` },
+      );
     }
 
     qb.orderBy('asset.purchase_date', 'DESC');
@@ -130,6 +143,14 @@ export class AssetService {
 
     if (dto.name !== undefined) {
       asset.name = dto.name.trim();
+    }
+
+    if (dto.assetTag !== undefined) {
+      asset.assetTag = this.normalizeOptionalString(dto.assetTag);
+    }
+
+    if (dto.serialNumber !== undefined) {
+      asset.serialNumber = this.normalizeOptionalString(dto.serialNumber);
     }
 
     asset.type = nextType;

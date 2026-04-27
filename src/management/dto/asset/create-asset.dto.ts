@@ -9,6 +9,16 @@ export class CreateAssetDto {
   @IsNotEmpty()
   name: string;
 
+  @ApiProperty({ description: 'Unique asset tag', example: 'ASSET-IT-0001' })
+  @IsString()
+  @IsNotEmpty()
+  assetTag: string;
+
+  @ApiProperty({ description: 'Unique serial number', example: 'SN-MBP16-M3-2026-0001' })
+  @IsString()
+  @IsNotEmpty()
+  serialNumber: string;
+
   @ApiProperty({ enum: ASSET_TYPE, example: ASSET_TYPE.PRIVATE })
   @IsEnum(ASSET_TYPE)
   type: ASSET_TYPE;

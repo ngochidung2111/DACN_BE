@@ -1,4 +1,5 @@
-import { IsArray, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsArray, IsEmail, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, MinLength } from 'class-validator';
+import { Type } from 'class-transformer';
 
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -108,6 +109,16 @@ export class SignupRequestDto {
   })
   @IsEnum(ROLE, { each: true, message: 'Each role must be a valid role value' })
   roles: ROLE;
+
+  @ApiProperty({
+    description: 'Remaining leave days for the employee',
+    example: 12,
+    required: false,
+  })
+  @Type(() => Number)
+  @IsNumber({}, { message: 'Leave balance must be a number' })
+  @IsOptional()
+  leaveBalance?: number;
 }
 
 export class SignupResponseDto {

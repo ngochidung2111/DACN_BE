@@ -29,7 +29,7 @@ export class DepartmentAttendanceEmployeeDto {
   @ApiProperty({ description: 'Total late days in the month', example: 2 })
   lateDays: number;
 
-  @ApiProperty({ description: 'Total absent days in the month', example: 6 })
+  @ApiProperty({ description: 'Total approved leave days in the month', example: 6 })
   absentDays: number;
 }
 
@@ -58,7 +58,7 @@ export class DepartmentAttendanceSummaryResponseDto {
   @ApiProperty({ description: 'Total late day records across the department', example: 8 })
   totalLateDays: number;
 
-  @ApiProperty({ description: 'Total absent day records across the department', example: 142 })
+  @ApiProperty({ description: 'Total approved leave days across the department in the month', example: 142 })
   totalAbsentDays: number;
 
   @ApiProperty({ type: [DepartmentAttendanceEmployeeDto] })

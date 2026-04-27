@@ -9,6 +9,16 @@ export class UpdateAssetDto {
   @IsString()
   name?: string;
 
+  @ApiPropertyOptional({ description: 'Unique asset tag', example: 'ASSET-IT-0001' })
+  @IsOptional()
+  @IsString()
+  assetTag?: string;
+
+  @ApiPropertyOptional({ description: 'Unique serial number', example: 'SN-MBP16-M3-2026-0001' })
+  @IsOptional()
+  @IsString()
+  serialNumber?: string;
+
   @ApiPropertyOptional({ enum: ASSET_TYPE, example: ASSET_TYPE.PUBLIC })
   @IsOptional()
   @IsEnum(ASSET_TYPE)

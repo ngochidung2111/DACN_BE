@@ -70,6 +70,9 @@ export class Employee {
   @Column({nullable: true})
   childrenDescription: string;
 
+  @Column({ type: 'int', default: 12 })
+  leaveBalance: number;
+
   @Column({nullable: true})
   avatarUrl: string;
 
