@@ -178,8 +178,9 @@ export class BookingController {
   async updateBooking(
     @Param('id') bookingId: string,
     @Body() updateBookingDto: UpdateBookingDto,
+    @Request() req,
   ) {
-    const booking = await this.bookingService.updateBooking(bookingId, updateBookingDto);
+    const booking = await this.bookingService.updateBooking(bookingId, updateBookingDto, req.user.userId);
     await this.bumpCacheVersion();
     return {
       success: true,

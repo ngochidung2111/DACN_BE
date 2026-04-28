@@ -122,6 +122,31 @@ export class ReportController {
     });
   }
 
+  @Get("/manager")
+  @ApiOperation({ summary: 'Get team reports (manager only)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Team reports retrieved successfully',
+    type: ReportListResponseDto,
+  })
+  async getTeamReports(@Query() query: QueryReportDto) {
+    return this.getOrSetCache('manager', this.serializeQuery(query as unknown as Record<string, unknown>), async () => {
+      console.log("A");
+      
+      const result = await this.reportService.getTeamReports(query);
+      const data = plainToInstance(ReportListResponseDto, result, {
+        excludeExtraneousValues: true,
+      });
+
+      return ResponseBuilder.createResponse({
+        statusCode: 200,
+        message: 'Team reports retrieved successfully',
+        data,
+      });
+    });
+  }
+
+
   @Get(':id')
   @ApiOperation({ summary: 'Get report details by ID' })
   @ApiResponse({
@@ -204,27 +229,6 @@ export class ReportController {
     });
   }
 
-  @Get("/manager")
-  @ApiOperation({ summary: 'Get team reports (manager only)' })
-  @ApiResponse({
-    status: 200,
-    description: 'Team reports retrieved successfully',
-    type: ReportListResponseDto,
-  })
-  async getTeamReports(@Query() query: QueryReportDto) {
-    return this.getOrSetCache('manager', this.serializeQuery(query as unknown as Record<string, unknown>), async () => {
-      const result = await this.reportService.getTeamReports(query);
-      const data = plainToInstance(ReportListResponseDto, result, {
-        excludeExtraneousValues: true,
-      });
-
-      return ResponseBuilder.createResponse({
-        statusCode: 200,
-        message: 'Team reports retrieved successfully',
-        data,
-      });
-    });
-  }
 
   private async getOrSetCache<T>(scope: string, suffix: string, factory: () => Promise<T>): Promise<T> {
     const version = await this.getCacheVersion();

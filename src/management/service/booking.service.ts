@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, In, Like, MoreThanOrEqual } from 'typeorm';
 import { Booking } from '../entity/booking.entity';
@@ -300,14 +300,62 @@ export class BookingService {
   }
 
   // Cập nhật booking đơn lẻ
-  async updateBooking(bookingId: string, updateBookingDto: UpdateBookingDto): Promise<BookingResponseDto> {
+  async updateBooking(
+    bookingId: string,
+    updateBookingDto: UpdateBookingDto,
+    requesterId: string,
+  ): Promise<BookingResponseDto> {
     const booking = await this.getBookingEntityById(bookingId);
+
+    // Chỉ creator mới được sửa
+    if (!booking.employee || booking.employee.id !== requesterId) {
+      throw new ForbiddenException('Only the creator can update this booking');
+    }
 
     // Nếu là booking lặp lại, không cho phép đổi thời gian
     if (booking.recurring_pattern) {
       throw new BadRequestException(
         'Cannot update time for recurring bookings. Please cancel this booking and create a new one.',
       );
+    }
+
+    // Handle potential room/time changes
+    let nextStart = booking.start_time;
+    let nextEnd = booking.end_time;
+    let nextRoom = booking.room;
+
+    if (updateBookingDto.start_time !== undefined) {
+      nextStart = new Date(updateBookingDto.start_time as any);
+    }
+    if (updateBookingDto.end_time !== undefined) {
+      nextEnd = new Date(updateBookingDto.end_time as any);
+    }
+
+    if (nextStart >= nextEnd) {
+      throw new BadRequestException('Start time must be before end time');
+    }
+
+    if (updateBookingDto.room_id !== undefined && updateBookingDto.room_id !== booking.room?.id) {
+      const room = await this.roomRepository.findOne({ where: { id: updateBookingDto.room_id } });
+      if (!room) {
+        throw new NotFoundException('Room not found');
+      }
+      nextRoom = room;
+    }
+
+    // Check availability excluding current booking
+    const isAvailable = await this.checkRoomAvailability(nextRoom.id, nextStart, nextEnd, booking.id);
+    if (!isAvailable) {
+      throw new BadRequestException('Room is not available for the selected time');
+    }
+
+    // Apply changes
+    booking.start_time = nextStart;
+    booking.end_time = nextEnd;
+    booking.room = nextRoom;
+
+    if (updateBookingDto.purpose !== undefined) {
+      booking.purpose = updateBookingDto.purpose;
     }
 
     // Cập nhật status
@@ -319,19 +367,19 @@ export class BookingService {
       booking.status = BOOKING_STATUS.CHECKED_OUT;
     }
 
+    let addedAttendees: Employee[] = [];
     if (updateBookingDto.attendee_ids !== undefined) {
       const previousAttendeeIds = new Set((booking.attendees ?? []).map((attendee) => attendee.id));
       const nextAttendees = await this.resolveAttendees(updateBookingDto.attendee_ids);
       booking.attendees = nextAttendees;
-
-      const addedAttendees = nextAttendees.filter((attendee) => !previousAttendeeIds.has(attendee.id));
-
-      const updatedBooking = await this.bookingRepository.save(booking);
-      await this.notifyAttendeesAboutBooking(updatedBooking, addedAttendees);
-      return this.toBookingResponseDto(updatedBooking);
+      addedAttendees = nextAttendees.filter((attendee) => !previousAttendeeIds.has(attendee.id));
     }
 
     const updatedBooking = await this.bookingRepository.save(booking);
+    if (addedAttendees.length > 0) {
+      await this.notifyAttendeesAboutBooking(updatedBooking, addedAttendees);
+    }
+
     return this.toBookingResponseDto(updatedBooking);
   }
 

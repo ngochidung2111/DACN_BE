@@ -72,7 +72,7 @@ export class EmployeeService {
       department = await this.departmentService.findByName(employeeData.department);
     }
     if (await this.checkEmail(employeeData.email)) {
-      throw new UnauthorizedException('Email already in use');
+      throw new BadRequestException('Email already in use');
     }
     const employee = this.employeeRepository.create({
       ...employeeData,

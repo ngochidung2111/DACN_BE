@@ -1,5 +1,5 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UploadedFile, UseGuards, UseInterceptors, Inject } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UploadedFile, UseGuards, UseInterceptors, Inject, ParseFilePipeBuilder } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { RoomService } from '../service/room.service';
 import { CreateRoomDto, UpdateRoomDto, RoomResponseDto } from '../dto';
@@ -128,7 +128,16 @@ export class RoomController {
   @Post(':id/image/upload')
   async uploadRoomImage(
     @Param('id') roomId: string,
-    @UploadedFile() file: any,
+    @UploadedFile(
+      new ParseFilePipeBuilder()
+        .addFileTypeValidator({ fileType: /^image\/(jpeg|jpg|png|webp|gif)$/i })
+        .addMaxSizeValidator({ maxSize: 5 * 1024 * 1024 })
+        .build({
+          fileIsRequired: true,
+          errorHttpStatusCode: 400,
+        }),
+    )
+    file: any,
   ) {
     const data = await this.roomService.uploadRoomImage(roomId, file);
     await this.bumpCacheVersion();
