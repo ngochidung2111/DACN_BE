@@ -1,7 +1,7 @@
 import { InjectRepository } from "@nestjs/typeorm";
 import { Department } from "../entity/department.entity";
 import { Repository } from "typeorm";
-import { NotFoundException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 
 
 export class DepartmentService {
@@ -35,6 +35,9 @@ export class DepartmentService {
     return result;
   }
   async create(name: string): Promise<Department> {
+    if (await this.departmentRepository.findOne({ where: { name } })) {
+      throw new BadRequestException({code: 'DEPARTMENT_ALREADY_EXISTS', message: 'Department with this name already exists'});
+    }
     const department = this.departmentRepository.create({ name });
     return await this.departmentRepository.save(department);
   }
