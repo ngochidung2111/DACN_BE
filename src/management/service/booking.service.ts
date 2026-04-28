@@ -179,8 +179,8 @@ export class BookingService {
     // Tính toán khoảng cách giữa start và end
     const duration = endDate.getTime() - startDate.getTime();
 
-    // Tạo các booking theo pattern cho đến khi đạt recurring_end_date
-    while (currentStart < recurringEndDate) {
+    // Tạo các booking theo pattern cho đến khi chạm recurring_end_date (inclusive)
+    while (currentStart <= recurringEndDate) {
       // Kiểm tra phòng có sẵn không
       const isAvailable = await this.checkRoomAvailability(room.id, currentStart, currentEnd);
       if (!isAvailable) {
@@ -310,13 +310,6 @@ export class BookingService {
     // Chỉ creator mới được sửa
     if (!booking.employee || booking.employee.id !== requesterId) {
       throw new ForbiddenException('Only the creator can update this booking');
-    }
-
-    // Nếu là booking lặp lại, không cho phép đổi thời gian
-    if (booking.recurring_pattern) {
-      throw new BadRequestException(
-        'Cannot update time for recurring bookings. Please cancel this booking and create a new one.',
-      );
     }
 
     // Handle potential room/time changes
