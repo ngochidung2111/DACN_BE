@@ -14,6 +14,8 @@ import {
 
 import {
   AssignAssetDto,
+  AssetListResponseDto,
+  AssetResponseDto,
   CreateAssetDto,
   QueryAssetDto,
   ReturnAssetDto,
@@ -66,7 +68,7 @@ export class AssetController {
   @ApiQuery({ name: 'assetTag', required: false })
   @ApiQuery({ name: 'serialNumber', required: false })
   @ApiQuery({ name: 'keyword', required: false })
-  @ApiResponse({ status: 200, description: 'Asset list' })
+  @ApiResponse({ status: 200, description: 'Asset list', type: AssetListResponseDto })
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get()
   async getAssets(@Query() query: QueryAssetDto) {
@@ -137,7 +139,7 @@ export class AssetController {
 
   @ApiOperation({ summary: 'Get asset by ID' })
   @ApiParam({ name: 'id', description: 'Asset ID' })
-  @ApiResponse({ status: 200, description: 'Asset details' })
+  @ApiResponse({ status: 200, description: 'Asset details', type: AssetResponseDto })
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get(':id')
   async getAssetById(@Param('id') assetId: string) {
