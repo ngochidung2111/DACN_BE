@@ -6,3 +6,5 @@ export * from './return-asset.dto';
 export * from './transfer-asset.dto';
 export * from './update-asset-condition.dto';
 export * from './update-asset-location.dto';
+export * from './asset-response.dto';
+export * from './asset-list-response.dto';

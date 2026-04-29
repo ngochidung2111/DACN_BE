@@ -1,9 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm';
+import { Not, Repository, IsNull } from 'typeorm';
 
 import {
   AssignAssetDto,
+  AssetListResponseDto,
+  AssetResponseDto,
   CreateAssetDto,
   QueryAssetDto,
   ReturnAssetDto,
@@ -16,6 +18,7 @@ import { AssetAssignment } from '../entity/asset-assignment.entity';
 import { Asset } from '../entity/asset.entity';
 import { ASSET_TYPE } from '../entity/constants';
 import { Employee } from '../../auth/entity/employee.entity';
+import { plainToInstance } from 'class-transformer';
 
 @Injectable()
 export class AssetService {
@@ -31,6 +34,8 @@ export class AssetService {
   async createAsset(dto: CreateAssetDto): Promise<Asset> {
     const type = dto.type;
     const location = this.normalizeOptionalString(dto.location);
+    const assetTag = dto.assetTag.trim();
+    const serialNumber = dto.serialNumber.trim();
 
     let owner: Employee | null = null;
     if (dto.ownerEmployeeId) {
@@ -38,11 +43,12 @@ export class AssetService {
     }
 
     this.validateTypeRules(type, owner?.id ?? null, location);
+    await this.ensureUniqueAssetFields({ assetTag, serialNumber });
 
     const asset = this.assetRepository.create({
       name: dto.name.trim(),
-      assetTag: dto.assetTag.trim(),
-      serialNumber: dto.serialNumber.trim(),
+      assetTag,
+      serialNumber,
       type,
       owner,
       location,
@@ -55,7 +61,7 @@ export class AssetService {
     return this.assetRepository.save(asset);
   }
 
-  async getAssets(query: QueryAssetDto) {
+  async getAssets(query: QueryAssetDto): Promise<AssetListResponseDto> {
     const page = query.page && query.page > 0 ? query.page : 1;
     const pageSize = query.pageSize && query.pageSize > 0 ? query.pageSize : 20;
 
@@ -101,15 +107,24 @@ export class AssetService {
       .take(pageSize)
       .getManyAndCount();
 
-    return {
-      items,
-      total,
-      page,
-      pageSize,
-    };
+    return plainToInstance(
+      AssetListResponseDto,
+      {
+        items: plainToInstance(AssetResponseDto, items, { excludeExtraneousValues: true }),
+        total,
+        page,
+        pageSize,
+      },
+      { excludeExtraneousValues: true },
+    );
   }
 
-  async getAssetById(assetId: string): Promise<Asset> {
+  async getAssetById(assetId: string): Promise<AssetResponseDto> {
+    const asset = await this.getAssetEntityById(assetId);
+    return asset;
+  }
+
+  private async getAssetEntityById(assetId: string): Promise<Asset> {
     const asset = await this.assetRepository.findOne({
       where: { id: assetId },
       relations: ['owner'],
@@ -123,7 +138,7 @@ export class AssetService {
   }
 
   async updateAsset(assetId: string, dto: UpdateAssetDto): Promise<Asset> {
-    const asset = await this.getAssetById(assetId);
+    const asset = await this.getAssetEntityById(assetId);
 
     const nextType = dto.type ?? asset.type;
     const nextLocationInput = dto.location !== undefined ? dto.location : asset.location;
@@ -153,6 +168,12 @@ export class AssetService {
       asset.serialNumber = this.normalizeOptionalString(dto.serialNumber);
     }
 
+    await this.ensureUniqueAssetFields({
+      assetTag: asset.assetTag ?? null,
+      serialNumber: asset.serialNumber ?? null,
+      excludeAssetId: asset.id,
+    });
+
     asset.type = nextType;
     asset.owner = nextOwner;
     asset.location = nextLocation;
@@ -177,18 +198,18 @@ export class AssetService {
   }
 
   async updateAssetCondition(assetId: string, dto: UpdateAssetConditionDto): Promise<Asset> {
-    const asset = await this.getAssetById(assetId);
+    const asset = await this.getAssetEntityById(assetId);
     asset.condition = dto.condition;
     return this.assetRepository.save(asset);
   }
 
   async deleteAsset(assetId: string): Promise<void> {
-    const asset = await this.getAssetById(assetId);
+    const asset = await this.getAssetEntityById(assetId);
     await this.assetRepository.remove(asset);
   }
 
   async assignPrivateAsset(assetId: string, dto: AssignAssetDto) {
-    const asset = await this.getAssetById(assetId);
+    const asset = await this.getAssetEntityById(assetId);
     this.ensurePrivateAsset(asset);
 
     const assignee = await this.findEmployeeOrThrow(dto.employeeId);
@@ -230,7 +251,7 @@ export class AssetService {
   }
 
   async returnPrivateAsset(assetId: string, dto: ReturnAssetDto) {
-    const asset = await this.getAssetById(assetId);
+    const asset = await this.getAssetEntityById(assetId);
     this.ensurePrivateAsset(asset);
 
     const returnDate = dto.returnDate ? new Date(dto.returnDate) : new Date();
@@ -264,7 +285,7 @@ export class AssetService {
   }
 
   async transferPrivateAsset(assetId: string, dto: TransferAssetDto) {
-    const asset = await this.getAssetById(assetId);
+    const asset = await this.getAssetEntityById(assetId);
     this.ensurePrivateAsset(asset);
 
     const toEmployee = await this.findEmployeeOrThrow(dto.toEmployeeId);
@@ -313,7 +334,7 @@ export class AssetService {
   }
 
   async getAssetAssignments(assetId: string): Promise<AssetAssignment[]> {
-    await this.getAssetById(assetId);
+    await this.getAssetEntityById(assetId);
 
     return this.assetAssignmentRepository.find({
       where: { asset: { id: assetId } },
@@ -323,7 +344,7 @@ export class AssetService {
   }
 
   async updatePublicAssetLocation(assetId: string, dto: UpdateAssetLocationDto): Promise<Asset> {
-    const asset = await this.getAssetById(assetId);
+    const asset = await this.getAssetEntityById(assetId);
 
     if (asset.type !== ASSET_TYPE.PUBLIC) {
       throw new BadRequestException('Only PUBLIC asset supports location update endpoint');
@@ -423,6 +444,38 @@ export class AssetService {
 
     const trimmed = value.trim();
     return trimmed.length > 0 ? trimmed : null;
+  }
+
+  private async ensureUniqueAssetFields(params: {
+    assetTag: string | null;
+    serialNumber: string | null;
+    excludeAssetId?: string;
+  }): Promise<void> {
+    if (params.assetTag) {
+      const existingAssetTag = await this.assetRepository.findOne({
+        where: {
+          assetTag: params.assetTag,
+          ...(params.excludeAssetId ? { id: Not(params.excludeAssetId) } : {}),
+        },
+      });
+
+      if (existingAssetTag) {
+        throw new BadRequestException('Asset tag already exists');
+      }
+    }
+
+    if (params.serialNumber) {
+      const existingSerialNumber = await this.assetRepository.findOne({
+        where: {
+          serialNumber: params.serialNumber,
+          ...(params.excludeAssetId ? { id: Not(params.excludeAssetId) } : {}),
+        },
+      });
+
+      if (existingSerialNumber) {
+        throw new BadRequestException('Serial number already exists');
+      }
+    }
   }
 
   private validateTypeRules(type: ASSET_TYPE, ownerEmployeeId: string | null, location: string | null): void {

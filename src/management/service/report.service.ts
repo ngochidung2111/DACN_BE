@@ -67,7 +67,8 @@ export class ReportService {
    */
   async getReports(query: QueryReportDto): Promise<ReportListResponseDto> {
     const { page, limit, sort_by, sort_order, employee_id, status, from_date, to_date } = query;
-
+    const safePage = Number.isFinite(Number(page)) && Number(page) > 0 ? Number(page) : 1;
+    const safeLimit = Number.isFinite(Number(limit)) && Number(limit) > 0 ? Number(limit) : 10;
     const qb = this.reportRepository.createQueryBuilder('report')
       .leftJoinAndSelect('report.employee', 'employee');
 
@@ -92,25 +93,24 @@ export class ReportService {
     }
 
     const total = await qb.getCount();
-
     const reports = await qb
       .orderBy(
         `report.${sort_by || 'week_starting'}`,
         sort_order || 'DESC',
       )
-      .skip((page - 1) * limit)
-      .take(limit)
+      .skip((safePage - 1) * safeLimit)
+      .take(safeLimit)
       .getMany();
 
-    const total_pages = Math.ceil(total / limit);
+    const total_pages = Math.ceil(total / safeLimit);
 
     return {
       data: plainToInstance(ReportResponseDto, reports, {
         excludeExtraneousValues: true,
       }),
       total,
-      page,
-      limit,
+      page: safePage,
+      limit: safeLimit,
       total_pages,
     };
   }
