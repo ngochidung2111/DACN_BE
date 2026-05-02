@@ -14,7 +14,7 @@ import { QueryEmployeeDto } from '../dto/query-employee.dto';
 import { EmployeeListResponseDto } from '../dto/employee-list-response.dto';
 
 import { plainToInstance } from 'class-transformer';
-import { AdminCreateEmployeeDto, AdminUpdateEmployeeDto, EmployeeDto, UpdateProfileDto } from '../dto/employee.dto';
+import { AdminCreateEmployeeDto, AdminUpdateEmployeeDto, DetailEmployeeDto, EmployeeDto, UpdateProfileDto } from '../dto/employee.dto';
 import { ROLE } from '../../management/entity/constants';
 import { ResponseBuilder } from '../../lib/dto/response-builder.dto';
 
@@ -34,7 +34,7 @@ export class EmployeeController {
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get('profile')
-  @ApiResponse({ status: 200, description: 'The user profile.', type: EmployeeDto })
+  @ApiResponse({ status: 200, description: 'The user profile.', type: DetailEmployeeDto })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   async getProfile(@Request() req) {
     const requester = String(req.user.id || req.user.email || 'unknown');
@@ -43,7 +43,7 @@ export class EmployeeController {
       return ResponseBuilder.createResponse({
         statusCode: 200,
         message: 'Profile retrieved successfully',
-        data: plainToInstance(EmployeeDto, employee, { excludeExtraneousValues: true }),
+        data: plainToInstance(DetailEmployeeDto, employee, { excludeExtraneousValues: true }),
       });
     });
   }
@@ -106,7 +106,7 @@ export class EmployeeController {
   @Roles(ROLE.ADMIN, ROLE.MANAGER)
   @Patch('by-admin/:id')
   @ApiBody({ type: AdminUpdateEmployeeDto })
-  @ApiResponse({ status: 200, description: 'Employee updated successfully.', type: EmployeeDto })
+  @ApiResponse({ status: 200, description: 'Employee updated successfully.', type: DetailEmployeeDto })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'Employee not found.' })
@@ -116,7 +116,7 @@ export class EmployeeController {
     return ResponseBuilder.createResponse({
       statusCode: 200,
       message: 'Employee updated successfully',
-      data: plainToInstance(EmployeeDto, updated, { excludeExtraneousValues: true }),
+      data: plainToInstance(DetailEmployeeDto, updated, { excludeExtraneousValues: true }),
     });
   }
 
@@ -262,7 +262,7 @@ export class EmployeeController {
       return ResponseBuilder.createResponse({
         statusCode: 200,
         message: 'Employee retrieved successfully',
-        data: plainToInstance(EmployeeDto, employee, { excludeExtraneousValues: true }),
+        data: plainToInstance(DetailEmployeeDto, employee, { excludeExtraneousValues: true }),
       });
     });
   }
