@@ -211,6 +211,154 @@ export class EmployeeDto {
     avatarUrl?: string;
 }
 
+export class DetailEmployeeDto {
+    @ApiProperty({
+        description: 'ID of the employee',
+        example: '12345',
+    })
+    @Expose()
+    id: string;
+    
+    @ApiProperty({
+        description: 'User last name',
+        example: 'Doe',
+    })
+    @Expose()
+    lastName: string;
+  
+    @ApiProperty({
+        description: 'User first name',
+        example: 'John',
+    })
+    @Expose()
+    firstName: string;
+
+    @ApiProperty({
+        description: 'User middle name',
+        example: 'Michael',
+    })
+    @Expose()
+    middleName: string;
+
+    @ApiProperty({
+        description: 'User gender',
+        example: 'Male',
+    })
+    @Expose()
+    gender: GENDER;
+
+    @ApiProperty({
+        description: 'User date of birth',
+        example: '1990-01-01',
+    })
+    @Expose()
+    dateOfBirth: Date;
+
+    @ApiProperty({
+        description: 'User email address',
+        example: 'john.doe@example.com',
+    })
+    @Expose()
+    email: string;
+
+    @ApiProperty({
+        description: 'Roles assigned to the user',
+        example: ROLE.ADMIN,
+    })
+    @Expose()
+    roles: ROLE;
+
+    @ApiProperty({
+        description: 'User phone number',
+        example: '+1234567890',
+        required: false,
+    })
+    @Expose()
+    phone?: string;
+
+    @ApiProperty({
+        description: 'Basic salary of the employee',
+        example: 50000,
+        required: false,
+    })
+    @Expose()
+    basicSalary?: number;
+
+    @ApiProperty({
+        description: 'Gross salary of the employee',
+        example: 60000,
+        required: false,
+    })
+    @Expose()
+    grossSalary?: number;
+
+    @ApiProperty({
+        description: 'Contract sign date',
+        example: '2024-01-01',
+        required: false,
+    })
+    @Expose()
+    signDate?: Date;
+
+    @ApiProperty({
+        description: 'Quit date',
+        example: '2025-12-31',
+        required: false,
+    })
+    @Expose()
+    quitDate?: Date;
+
+    @ApiProperty({
+        description: 'ID card number',
+        example: '123456789',
+        required: false,
+    })
+    @Expose()
+    idCard?: string;
+
+    @ApiProperty({
+        description: 'Employee address',
+        example: '123 Main St, City, Country',
+        required: false,
+    })
+    @Expose()
+    address?: string;
+
+    @ApiProperty({ description: 'Marital status', example: true, required: false })
+    @Expose()
+    marriedStatus?: boolean;
+
+    @ApiProperty({ description: 'Number of children', example: 2, required: false })
+    @Expose()
+    numberOfChildren?: number;
+
+    @ApiProperty({ description: 'Children information', example: 'Two kids, ages 5 and 8', required: false })
+    @Expose()
+    childrenDescription?: string;
+
+    @ApiProperty({ description: 'Remaining leave days', example: 12, required: false })
+    @Expose()
+    leaveBalance?: number;
+
+    @ApiProperty({
+        description: 'Department of the employee',
+        example: 'Sales',
+        required: false,
+    })
+    @Expose()
+    @Type(() => DepartmentDto)
+    department?: DepartmentDto;
+
+    @ApiProperty({ description: 'Employee degrees', required: false, type: () => [DegreeDto] })
+    @Expose()
+    @Type(() => DegreeDto)
+    degrees?: DegreeDto[];
+
+    @ApiProperty({ description: 'Avatar URL', example: 'https://example.com/avatar.jpg', required: false })
+    @Expose()
+    avatarUrl?: string;
+}
+
 export class UpdateProfileDto {
     
     @ApiProperty({
