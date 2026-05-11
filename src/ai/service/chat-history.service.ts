@@ -32,11 +32,14 @@ export class ChatHistoryService {
     sessionId: string,
     limit: number = 10,
   ): Promise<ChatHistory[]> {
-    return this.chatHistoryRepository.find({
+    // Return the most recent `limit` messages in chronological order.
+    const results = await this.chatHistoryRepository.find({
       where: { userId, sessionId },
-      order: { createdAt: 'ASC' },
+      order: { createdAt: 'DESC' },
       take: limit,
     });
+
+    return results.reverse();
   }
 
   async getUserSessions(userId: string, limit: number = 20): Promise<string[]> {

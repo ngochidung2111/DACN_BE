@@ -26,6 +26,7 @@ import { Cache } from 'cache-manager';
 
 import {
   CreateReportDto,
+  ReviewReportDto,
   UpdateReportDto,
   QueryReportDto,
   ReportListResponseDto,
@@ -34,6 +35,8 @@ import {
 import { Report } from '../entity/report.entity';
 import { ReportService } from '../service/report.service';
 import { RolesGuard } from '../../auth/roles.guard';
+import { Roles } from '../../auth/roles.decorator';
+import { ROLE } from '../entity/constants';
 import { ResponseBuilder } from '../../lib/dto/response-builder.dto';
 
 @Controller('management/reports')
@@ -225,6 +228,34 @@ export class ReportController {
     return ResponseBuilder.createResponse({
       statusCode: 200,
       message: 'Report submitted successfully',
+      data,
+    });
+  }
+
+  @Patch(':id/review')
+  @ApiOperation({ summary: 'Review report (manager only)' })
+  @ApiBody({ type: ReviewReportDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Report reviewed successfully',
+    type: ReportResponseDto,
+  })
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(ROLE.MANAGER)
+  async review(
+    @Param('id') id: string,
+    @Body() dto: ReviewReportDto,
+    @Req() req: any,
+  ) {
+    const report = await this.reportService.reviewReport(id, req.user.userId, dto);
+    await this.bumpCacheVersion();
+    const data = plainToInstance(ReportResponseDto, report, {
+      excludeExtraneousValues: true,
+    });
+
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'Report reviewed successfully',
       data,
     });
   }

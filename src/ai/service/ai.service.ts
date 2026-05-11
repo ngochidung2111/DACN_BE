@@ -47,7 +47,7 @@ export class AiService {
 
     if (this.isRestrictedSystemStatsQuestion(params.message) && !this.hasRole(normalizedRoles, ROLE.ADMIN)) {
       const deniedReply =
-        'Ban khong co quyen truy van thong ke he thong. Chi role ADMIN moi duoc phep hoi cac thong tin tong hop toan he thong.';
+        'Bạn không có quyền truy cập thông tin này. Vui lòng liên hệ quản trị viên nếu bạn nghĩ đây là lỗi.';
 
       await this.chatHistoryService.saveMessage(
         params.userId,
@@ -168,24 +168,42 @@ export class AiService {
         name: 'attendance_check_in',
         description: 'Check in attendance for current user.',
         func: async () => {
-          const attendance = await this.attendanceService.checkIn(params.userId);
-          return JSON.stringify({
-            success: true,
-            message: 'Checked in successfully',
-            data: attendance,
-          });
+          try {
+            const attendance = await this.attendanceService.checkIn(params.userId);
+            return JSON.stringify({
+              success: true,
+              message: 'Checked in successfully',
+              data: attendance,
+            });
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            return JSON.stringify({
+              success: false,
+              error: errorMessage,
+              message: 'Bạn đã check in rồi và chưa check out. Vui lòng check out trước khi check in lại.',
+            });
+          }
         },
       }),
       new DynamicTool({
         name: 'attendance_check_out',
         description: 'Check out attendance for current user.',
         func: async () => {
-          const attendance = await this.attendanceService.checkOut(params.userId);
-          return JSON.stringify({
-            success: true,
-            message: 'Checked out successfully',
-            data: attendance,
-          });
+          try {
+            const attendance = await this.attendanceService.checkOut(params.userId);
+            return JSON.stringify({
+              success: true,
+              message: 'Checked out successfully',
+              data: attendance,
+            });
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            return JSON.stringify({
+              success: false,
+              error: errorMessage,
+              message: 'Bạn chưa check in. Vui lòng check in trước.',
+            });
+          }
         },
       }),
       new DynamicTool({
@@ -703,25 +721,221 @@ export class AiService {
             roomId = selectedRoom.room.id;
           }
 
-          const booking = await this.bookingService.createBooking(params.userId, {
-            room_id: String(roomId || ''),
-            start_time: String(payload.start_time || ''),
-            end_time: String(payload.end_time || ''),
-            purpose: String(payload.purpose || ''),
-            attendee_ids: this.readStringArray(payload.attendee_ids),
-          });
+          try {
+            const booking = await this.bookingService.createBooking(params.userId, {
+              room_id: String(roomId || ''),
+              start_time: String(payload.start_time || ''),
+              end_time: String(payload.end_time || ''),
+              purpose: String(payload.purpose || ''),
+              attendee_ids: this.readStringArray(payload.attendee_ids),
+            });
 
-          return JSON.stringify({
-            success: true,
-            message: 'Meeting room booked successfully',
-            data: booking,
-          });
+            return JSON.stringify({
+              success: true,
+              message: 'Meeting room booked successfully',
+              data: booking,
+            });
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            this.logger.error('book_meeting_room failed', error as any);
+            return JSON.stringify({
+              success: false,
+              error: errorMessage,
+            });
+          }
+        },
+      }),
+      new DynamicTool({
+        name: 'get_system_attendance_stats',
+        description:
+          'Get system-wide attendance statistics for today. ADMIN ONLY. Input JSON optional: department_id. Returns total checked in, pending checkout, etc.',
+        func: async (input: string) => {
+          const normalizedRoles = this.normalizeRoles(params.roles);
+          if (!this.hasRole(normalizedRoles, ROLE.ADMIN)) {
+            return JSON.stringify({
+              success: false,
+              error: 'Only ADMIN can access system attendance statistics',
+            });
+          }
+
+          try {
+            const payload = this.parseJsonInput(input);
+            const departmentId = this.readOptionalString(payload.department_id);
+
+            if (departmentId) {
+              const deptStatus = await this.attendanceService.getDepartmentTodayCheckInStatus(
+                params.userId,
+              );
+              return JSON.stringify({
+                success: true,
+                scope: 'department',
+                data: deptStatus,
+              });
+            }
+
+            // System-wide stats for all departments
+            const departments = await this.departmentService.findAll();
+            const stats: Array<{ department: string; checked_in: number; pending_checkout: number }> = [];
+
+            for (const dept of departments) {
+              const employees = await this.employeeService.findByDepartmentId(dept.id);
+              let checkedIn = 0;
+              let pendingCheckout = 0;
+
+              for (const emp of employees) {
+                const status = await this.attendanceService.getTodayCheckInStatus(emp.id);
+                if (status.checkedIn) {
+                  checkedIn++;
+                  if (!status.checkedOut) {
+                    pendingCheckout++;
+                  }
+                }
+              }
+
+              stats.push({
+                department: dept.name,
+                checked_in: checkedIn,
+                pending_checkout: pendingCheckout,
+              });
+            }
+
+            return JSON.stringify({
+              success: true,
+              scope: 'system',
+              total_departments: departments.length,
+              data: stats,
+            });
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            return JSON.stringify({
+              success: false,
+              error: errorMessage,
+            });
+          }
+        },
+      }),
+      new DynamicTool({
+        name: 'get_system_leave_stats',
+        description:
+          'Get system-wide leave request statistics. ADMIN ONLY. Returns total pending, approved, rejected leave requests.',
+        func: async () => {
+          const normalizedRoles = this.normalizeRoles(params.roles);
+          if (!this.hasRole(normalizedRoles, ROLE.ADMIN)) {
+            return JSON.stringify({
+              success: false,
+              error: 'Only ADMIN can access system leave statistics',
+            });
+          }
+
+          try {
+            const departments = await this.departmentService.findAll();
+            const summaries: Array<{
+              department: string;
+              total: number;
+              pending: number;
+              approved: number;
+              rejected: number;
+            }> = [];
+
+            for (const dept of departments) {
+              const employees = await this.employeeService.findByDepartmentId(dept.id);
+              let deptTotal = 0;
+              let deptPending = 0;
+              let deptApproved = 0;
+              let deptRejected = 0;
+
+              for (const emp of employees) {
+                try {
+                  const summary = await this.leaveRequestService.getMyLeaveSummary(emp.id);
+                  deptTotal += summary.total;
+                  deptPending += summary.pending || 0;
+                  deptApproved += summary.approved || 0;
+                  deptRejected += summary.rejected || 0;
+                } catch {
+                  // Skip if error
+                }
+              }
+
+              if (deptTotal > 0) {
+                summaries.push({
+                  department: dept.name,
+                  total: deptTotal,
+                  pending: deptPending,
+                  approved: deptApproved,
+                  rejected: deptRejected,
+                });
+              }
+            }
+
+            const totalStats = {
+              total: summaries.reduce((sum, s) => sum + s.total, 0),
+              pending: summaries.reduce((sum, s) => sum + s.pending, 0),
+              approved: summaries.reduce((sum, s) => sum + s.approved, 0),
+              rejected: summaries.reduce((sum, s) => sum + s.rejected, 0),
+            };
+
+            return JSON.stringify({
+              success: true,
+              scope: 'system',
+              total_stats: totalStats,
+              by_department: summaries,
+            });
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            return JSON.stringify({
+              success: false,
+              error: errorMessage,
+            });
+          }
+        },
+      }),
+      new DynamicTool({
+        name: 'get_system_employee_stats',
+        description:
+          'Get system-wide employee statistics. ADMIN ONLY. Returns total employees by department, roles distribution.',
+        func: async () => {
+          const normalizedRoles = this.normalizeRoles(params.roles);
+          if (!this.hasRole(normalizedRoles, ROLE.ADMIN)) {
+            return JSON.stringify({
+              success: false,
+              error: 'Only ADMIN can access system employee statistics',
+            });
+          }
+
+          try {
+            const departments = await this.departmentService.findAll();
+            const deptStats: Array<{ department: string; total_employees: number }> = [];
+            let totalEmployees = 0;
+
+            for (const dept of departments) {
+              const employees = await this.employeeService.findByDepartmentId(dept.id);
+              deptStats.push({
+                department: dept.name,
+                total_employees: employees.length,
+              });
+              totalEmployees += employees.length;
+            }
+
+            return JSON.stringify({
+              success: true,
+              scope: 'system',
+              total_employees: totalEmployees,
+              total_departments: departments.length,
+              by_department: deptStats,
+            });
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            return JSON.stringify({
+              success: false,
+              error: errorMessage,
+            });
+          }
         },
       }),
     ];
 
     const systemPrompt =
-      'You are an internal HR assistant. Answer clearly and concisely. Use available tools when needed. Always respond in Vietnamese unless the user asks for another language. You can support profile lookup, attendance, leave requests, announcements, ticket support, and meeting room booking. For ticket requests, first call suggest_ticket_category with issue_text, then call list_my_ticket_categories and ask user to choose a category before creating ticket. If department has no category permission, still provide recommendation based on category description and explain that admin/manager must assign permission first. For meeting room requests, proactively use tools to check schedule before suggesting booking and confirm booking details after creating one.';
+      'You are an internal HR assistant. Answer clearly and concisely. Use available tools when needed. Always respond in Vietnamese unless the user asks for another language. You can support profile lookup, attendance, leave requests, announcements, ticket support, and meeting room booking. For ticket requests, first call suggest_ticket_category with issue_text, then call list_my_ticket_categories and ask user to choose a category before creating ticket. If department has no category permission, still provide recommendation based on category description and explain that admin/manager must assign permission first. For meeting room requests, proactively use tools to check schedule before suggesting booking and confirm booking details after creating one. For ADMIN users: You also have access to system-wide statistics tools (get_system_attendance_stats, get_system_leave_stats, get_system_employee_stats). Use these tools when admin asks for system reports, dashboards, or company-wide statistics.';
 
     const agent = createAgent({
       model: llm,

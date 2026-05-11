@@ -4,12 +4,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Attendance } from '../entity/attendance.entity';
 import { PAYROLL_STATUS, Payroll } from '../entity/payroll.entity';
-
+import { Holiday } from '../entity/holiday.entity';
 import { EmployeeService } from '../../auth/service/employee.service';
+import { HolidayService } from './holiday.service';
 
 @Injectable()
 export class PayrollService {
-  private readonly standardWorkingDays = 26;
   private readonly standardWorkingHoursPerDay = 8;
   private readonly overtimeRate = 1.5;
 
@@ -19,6 +19,7 @@ export class PayrollService {
     @InjectRepository(Attendance)
     private readonly attendanceRepository: Repository<Attendance>,
     private readonly employeeService: EmployeeService,
+    private readonly holidayService: HolidayService,
   ) {}
 
   async generateMonthlyPayroll(employeeId: string, year: number, month: number): Promise<Payroll> {
@@ -33,6 +34,9 @@ export class PayrollService {
 
     const periodStart = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
     const periodEnd = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
+
+    // Calculate working days excluding weekends and holidays
+    const standardWorkingDays = await this.calculateWorkingDaysInMonth(year, month);
 
     const attendances = await this.attendanceRepository
       .createQueryBuilder('attendance')
@@ -49,7 +53,7 @@ export class PayrollService {
     }, 0);
 
     const workedHours = this.round2(totalWorkedMs / (1000 * 60 * 60));
-    const standardHours = this.standardWorkingDays * this.standardWorkingHoursPerDay;
+    const standardHours = standardWorkingDays * this.standardWorkingHoursPerDay;
     const basicSalarySnapshot = Number(employee.basicSalary);
     const hourlyRate = basicSalarySnapshot / standardHours;
 
@@ -98,6 +102,37 @@ export class PayrollService {
       where: { employeeId, year, month },
       relations: ['employee'],
     });
+  }
+
+  /**
+   * Tính số ngày làm việc trong tháng (trừ thứ 7, chủ nhật và ngày lễ)
+   */
+  private async calculateWorkingDaysInMonth(year: number, month: number): Promise<number> {
+    const startDate = new Date(Date.UTC(year, month - 1, 1));
+    const endDate = new Date(Date.UTC(year, month, 1));
+
+    // Get all holidays in the month
+    const holidays = await this.holidayService.getHolidaysByMonth(year, month);
+    const holidayDates = new Set(
+      holidays.map((h) => new Date(h.date).toDateString()),
+    );
+
+    let workingDays = 0;
+    const currentDate = new Date(startDate);
+
+    while (currentDate < endDate) {
+      const dayOfWeek = currentDate.getUTCDay();
+      const dateString = currentDate.toDateString();
+
+      // Kiểm tra nếu không phải thứ 7 (6) hoặc chủ nhật (0) và không phải ngày lễ
+      if (dayOfWeek !== 0 && dayOfWeek !== 6 && !holidayDates.has(dateString)) {
+        workingDays++;
+      }
+
+      currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+    }
+
+    return workingDays;
   }
 
   /**
