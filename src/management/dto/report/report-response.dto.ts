@@ -29,6 +29,14 @@ export class ReportResponseDto {
 
   @Expose()
   @ApiProperty({
+    description: 'Manager review note',
+    nullable: true,
+    required: false,
+  })
+  review: string | null;
+
+  @Expose()
+  @ApiProperty({
     description: 'What is in progress',
   })
   in_progress: string;
@@ -46,6 +54,15 @@ export class ReportResponseDto {
   })
   blocker: string;
 
+  @Expose()
+  @Transform(({ obj }) => obj.review_by?.id ?? null)
+  @ApiProperty({
+    description: 'Reviewer employee ID',
+    nullable: true,
+    required: false,
+  })
+  review_by_id: string | null;
+
   @Expose()  
   @Transform(({ obj }) => {
     if (obj.employee) {
@@ -59,6 +76,22 @@ export class ReportResponseDto {
     }
   })
   employee: EmployeeMinimalDto;
+
+  @Expose()
+  @Transform(({ obj }) => {
+    if (obj.review_by) {
+      return {
+        id: obj.review_by.id,
+        firstName: obj.review_by.firstName,
+        middleName: obj.review_by.middleName,
+        lastName: obj.review_by.lastName,
+        email: obj.review_by.email,
+      };
+    }
+
+    return null;
+  })
+  review_by: EmployeeMinimalDto | null;
 
   @Expose()
   @ApiProperty({

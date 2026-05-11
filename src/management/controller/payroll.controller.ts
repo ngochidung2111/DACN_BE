@@ -1,6 +1,6 @@
 import { Body, Controller, Post, Request, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiBody } from '@nestjs/swagger';
 
 import { PayrollMonthDto } from '../dto/payroll';
 import { PayrollService } from '../service/payroll.service';
@@ -14,6 +14,7 @@ export class PayrollController {
   constructor(private readonly payrollService: PayrollService) {}
 
   @ApiOperation({ summary: 'Generate monthly payroll for logged-in employee' })
+  @ApiBody({ type: PayrollMonthDto })
   @ApiResponse({ status: 201, description: 'Payroll generated successfully' })
   @ApiResponse({ status: 400, description: 'Invalid period or missing salary setup' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -29,6 +30,7 @@ export class PayrollController {
   }
 
   @ApiOperation({ summary: 'Get payroll by month for logged-in employee' })
+  @ApiBody({ type: PayrollMonthDto })
   @ApiResponse({ status: 200, description: 'Payroll retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(AuthGuard('jwt'), RolesGuard)

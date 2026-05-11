@@ -11,6 +11,7 @@ import { plainToInstance } from 'class-transformer';
 import {
   CreateReportDto,
   UpdateReportDto,
+  ReviewReportDto,
   QueryReportDto,
   ReportListResponseDto,
   ReportResponseDto,
@@ -55,6 +56,8 @@ export class ReportService {
     report.blocker = dto.blocker ? dto.blocker : null;
     report.progress_percentage = dto.progress_percentage || 0;
     report.progress_notes = dto.progress_notes ? dto.progress_notes : null;
+    report.review = null;
+    report.review_by = null;
     report.status = REPORT_STATUS.DRAFT;
     report.created_at = new Date();
     report.updated_at = new Date();
@@ -70,7 +73,8 @@ export class ReportService {
     const safePage = Number.isFinite(Number(page)) && Number(page) > 0 ? Number(page) : 1;
     const safeLimit = Number.isFinite(Number(limit)) && Number(limit) > 0 ? Number(limit) : 10;
     const qb = this.reportRepository.createQueryBuilder('report')
-      .leftJoinAndSelect('report.employee', 'employee');
+      .leftJoinAndSelect('report.employee', 'employee')
+      .leftJoinAndSelect('report.review_by', 'reviewBy');
 
     if (employee_id) {
       qb.andWhere('report.employee_id = :employee_id', { employee_id });
@@ -134,7 +138,12 @@ export class ReportService {
    * Get report by ID
    */
   async getReportById(id: string): Promise<Report> {
-    const report = await this.reportRepository.findOne({ where: { id } });
+    const report = await this.reportRepository
+      .createQueryBuilder('report')
+      .leftJoinAndSelect('report.employee', 'employee')
+      .leftJoinAndSelect('report.review_by', 'reviewBy')
+      .where('report.id = :id', { id })
+      .getOne();
 
     if (!report) {
       throw new NotFoundException(`Report with ID ${id} not found`);
@@ -152,8 +161,8 @@ export class ReportService {
   ): Promise<Report> {
     const report = await this.getReportById(id);
 
-    if (report.status === REPORT_STATUS.SUBMITTED) {
-      throw new BadRequestException('Cannot update a submitted report');
+    if (report.status === REPORT_STATUS.SUBMITTED || report.status === REPORT_STATUS.REVIEWED) {
+      throw new BadRequestException('Cannot update a submitted or reviewed report');
     }
 
     Object.assign(report, {
@@ -165,13 +174,43 @@ export class ReportService {
   }
 
   /**
+   * Review report
+   */
+  async reviewReport(
+    id: string,
+    reviewerId: string,
+    dto: ReviewReportDto,
+  ): Promise<Report> {
+    const report = await this.getReportById(id);
+
+    if (report.status !== REPORT_STATUS.SUBMITTED) {
+      throw new BadRequestException('Only submitted reports can be reviewed');
+    }
+
+    const reviewer = await this.employeeRepository.findOne({
+      where: { id: reviewerId },
+    });
+
+    if (!reviewer) {
+      throw new NotFoundException('Reviewer not found');
+    }
+
+    report.review = dto.review;
+    report.review_by = reviewer;
+    report.status = REPORT_STATUS.REVIEWED;
+    report.updated_at = new Date();
+
+    return this.reportRepository.save(report);
+  }
+
+  /**
    * Delete report
    */
   async deleteReport(id: string): Promise<void> {
     const report = await this.getReportById(id);
 
-    if (report.status === REPORT_STATUS.SUBMITTED) {
-      throw new BadRequestException('Cannot delete a submitted report');
+    if (report.status === REPORT_STATUS.SUBMITTED || report.status === REPORT_STATUS.REVIEWED) {
+      throw new BadRequestException('Cannot delete a submitted or reviewed report');
     }
 
     await this.reportRepository.delete(id);

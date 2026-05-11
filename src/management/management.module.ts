@@ -12,6 +12,7 @@ import { TicketController } from './controller/ticket.controller';
 import { ReportController } from './controller/report.controller';
 import { AnnouncementController } from './controller/announcement.controller';
 import { NotificationController } from './controller/notification.controller';
+import { HolidayController } from './controller/holiday.controller';
 import { ManagementService } from './service/management.service';
 import { BookingService } from './service/booking.service';
 import { RoomService } from './service/room.service';
@@ -23,6 +24,7 @@ import { TicketService } from './service/ticket.service';
 import { ReportService } from './service/report.service';
 import { AnnouncementService } from './service/announcement.service';
 import { NotificationService } from './service/notification.service';
+import { HolidayService } from './service/holiday.service';
 import { RoomStatusScheduler } from './service/room-status.scheduler';
 import { Booking } from './entity/booking.entity';
 import { Room } from './entity/room.entity';
@@ -38,6 +40,7 @@ import { Report } from './entity/report.entity';
 import { TicketProcess } from './entity/ticket-process.entity';
 import { TicketCategory } from './entity/ticket-category.entity';
 import { Notification } from './entity/notification.entity';
+import { Holiday } from './entity/holiday.entity';
 import { AuthModule } from '../auth/auth.module';
 import { SharedModule } from '../shared/shared.module';
 import { Employee } from '../auth/entity/employee.entity';
@@ -60,6 +63,7 @@ import { Department } from '../auth/entity/department.entity';
       TicketProcess,
       TicketCategory,
       Notification,
+      Holiday,
       Employee,
       Department,
     ]),
@@ -71,6 +75,7 @@ import { Department } from '../auth/entity/department.entity';
     ManagementController,
     AnnouncementController,
     NotificationController,
+    HolidayController,
     BookingController,
     RoomController,
     AttendanceController,
@@ -85,6 +90,7 @@ import { Department } from '../auth/entity/department.entity';
     ManagementService,
     AnnouncementService,
     NotificationService,
+    HolidayService,
     BookingService,
     RoomService,
     AttendanceService,
@@ -102,6 +108,7 @@ import { Department } from '../auth/entity/department.entity';
     LeaveRequestService,
     AnnouncementService,
     TicketService,
+    HolidayService,
   ],
 })
 export class ManagementModule {}

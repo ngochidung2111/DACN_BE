@@ -18,6 +18,13 @@ export class Report {
   @JoinColumn({ name: 'employee_id' })
   employee: Employee;
 
+  @Column('text', { nullable: true })
+  review: string | null;
+
+  @ManyToOne(() => Employee, { nullable: true })
+  @JoinColumn({ name: 'review_by' })
+  review_by?: Employee | null;
+
   @Column()
   week_starting: Date;
 
