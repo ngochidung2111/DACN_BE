@@ -5,7 +5,7 @@ import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiQuery, ApiResponse, 
 import { Cache } from 'cache-manager';
 
 import { CreateLeaveRequestDto, ProcessLeaveRequestDto, QueryLeaveRequestDto, UpdateLeaveRequestDto } from '../dto';
-import { ROLE } from '../entity/constants';
+import { LEAVE_REQUEST_TYPE, ROLE } from '../entity/constants';
 import { LeaveRequestService } from '../service/leave-request.service';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
@@ -45,6 +45,18 @@ export class LeaveRequestController {
       message: 'Leave request submitted successfully',
       data: leaveRequest,
     };
+  }
+
+  @ApiOperation({ summary: 'Get standard leave types in company' })
+  @ApiResponse({ status: 200, description: 'Leave types retrieved successfully' })
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Get('types')
+  async getLeaveTypes() {
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'Leave types retrieved successfully',
+      data: this.leaveRequestService.getLeaveTypes(),
+    });
   }
 
   @ApiOperation({ summary: 'List leave requests of employees in manager department' })

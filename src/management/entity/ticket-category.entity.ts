@@ -1,5 +1,6 @@
 import {
   Column,
+  DeleteDateColumn,
   Entity,
   ManyToMany,
   OneToMany,
@@ -22,6 +23,9 @@ export class TicketCategory {
 
   @Column({ default: true })
   is_active: boolean;
+
+  @DeleteDateColumn({ nullable: true })
+  deletedAt?: Date;
 
   @ManyToMany(() => Department, (department) => department.ticketCategories)
   departments: Department[];

@@ -1,4 +1,4 @@
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { ForbiddenException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -132,6 +132,28 @@ export class S3Service {
       }
 
       throw new InternalServerErrorException('Could not upload file to AWS S3');
+    }
+  }
+
+  async deleteFile(key: string): Promise<void> {
+    try {
+      const command = new DeleteObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+      });
+
+      await this.s3Client.send(command);
+    } catch (error) {
+      const err = error as Error & { name?: string; Code?: string; code?: string; $metadata?: { httpStatusCode?: number } };
+      this.logger.error(`Failed to delete file with key ${key}`, err?.stack);
+
+      if (this.isAccessDeniedError(err)) {
+        throw new ForbiddenException(
+          'S3 access denied: ensure the IAM user or role has s3:DeleteObject permission on this bucket',
+        );
+      }
+
+      throw new InternalServerErrorException('Could not delete file from AWS S3');
     }
   }
 

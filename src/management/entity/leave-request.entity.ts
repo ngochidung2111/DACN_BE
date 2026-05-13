@@ -1,6 +1,6 @@
 
 import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
-import { LEAVE_REQUEST_STATUS } from "./constants";
+import { LEAVE_REQUEST_STATUS, LEAVE_REQUEST_TYPE } from "./constants";
 import { Employee } from "../../auth/entity/employee.entity";
 
 @Entity()
@@ -31,6 +31,9 @@ export class LeaveRequest {
 
     @Column()
     reason: string;
+
+    @Column({ type: 'enum', enum: LEAVE_REQUEST_TYPE })
+    type: LEAVE_REQUEST_TYPE;
 
     @Column()
     description: string;

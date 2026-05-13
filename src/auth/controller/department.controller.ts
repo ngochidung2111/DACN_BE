@@ -1,7 +1,7 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ApiBearerAuth, ApiBody, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { DepartmentService } from "../service/department.service";
-import { Body, Controller, Get, Inject, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Inject, Param, Post, Req, UseGuards } from "@nestjs/common";
 import { CreateDepartmentDto, DepartmentDto } from "../dto/department.dto";
 import { LoginResponseDto } from "../dto/login.dto";
 import { AuthGuard } from "@nestjs/passport";
@@ -59,6 +59,32 @@ export class DepartmentController {
         const created = await this.departmentService.create(createDepartmentDto.name);
         await this.bumpCacheVersion();
         return created;
+    }
+
+    @Delete(':id')
+    @UseGuards(AuthGuard('jwt'), RolesGuard)
+    @Roles(ROLE.ADMIN)
+    @ApiResponse({
+        status: 200,
+        description: 'Department deleted successfully.',
+    })
+    @ApiResponse({
+        status: 400,
+        description: 'Department has employees. Cannot delete.',
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'Department not found.',
+    })
+    @ApiResponse({ status: 401, description: 'Unauthorized.' })
+    async deleteDepartment(@Param('id') id: string) {
+        const result = await this.departmentService.delete(id);
+        await this.bumpCacheVersion();
+        return ResponseBuilder.createResponse({
+            statusCode: 200,
+            message: result.message,
+            data: null,
+        });
     }
 
     private async getOrSetCache<T>(scope: string, suffix: string, factory: () => Promise<T>): Promise<T> {

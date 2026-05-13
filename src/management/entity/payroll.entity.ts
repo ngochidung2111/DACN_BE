@@ -43,6 +43,18 @@ export class Payroll {
   workedHours: number;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  paidLeaveDays: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  paidLeaveHours: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  unpaidLeaveDays: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  unpaidLeaveHours: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   overtimeHours: number;
 
   @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })

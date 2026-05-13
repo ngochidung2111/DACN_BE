@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsDateString, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsDateString, IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { LEAVE_REQUEST_TYPE } from '../../entity/constants';
 
 export class CreateLeaveRequestDto {
   @ApiProperty({
@@ -17,6 +18,15 @@ export class CreateLeaveRequestDto {
   @IsDateString()
   @IsNotEmpty()
   date_to: string;
+
+  @ApiProperty({
+    description: 'Type of leave request',
+    enum: LEAVE_REQUEST_TYPE,
+    example: LEAVE_REQUEST_TYPE.PERSONAL,
+  })
+  @IsEnum(LEAVE_REQUEST_TYPE)
+  @IsNotEmpty()
+  type: LEAVE_REQUEST_TYPE;
 
   @ApiProperty({
     description: 'Reason for leave request',

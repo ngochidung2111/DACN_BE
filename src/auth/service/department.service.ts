@@ -41,4 +41,25 @@ export class DepartmentService {
     const department = this.departmentRepository.create({ name });
     return await this.departmentRepository.save(department);
   }
+
+  async delete(id: string): Promise<{ message: string }> {
+    const department = await this.departmentRepository.findOne({
+      where: { id },
+      relations: ['employees'],
+    });
+
+    if (!department) {
+      throw new NotFoundException({code: 'DEPARTMENT_NOT_FOUND', message: 'Department not found'});
+    }
+
+    if (department.employees && department.employees.length > 0) {
+      throw new BadRequestException({
+        code: 'DEPARTMENT_HAS_EMPLOYEES',
+        message: `Cannot delete department with ${department.employees.length} employee(s). Please transfer employees first.`
+      });
+    }
+
+    await this.departmentRepository.remove(department);
+    return { message: 'Department deleted successfully' };
+  }
 }

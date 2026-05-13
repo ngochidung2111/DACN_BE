@@ -12,7 +12,7 @@ import { AnnouncementService } from '../../management/service/announcement.servi
 import { AttendanceService } from '../../management/service/attendance.service';
 import { BookingService } from '../../management/service/booking.service';
 import { LeaveRequestService } from '../../management/service/leave-request.service';
-import { ROLE } from '../../management/entity/constants';
+import { LEAVE_REQUEST_TYPE, ROLE } from '../../management/entity/constants';
 import { TICKET_STATUS } from '../../management/entity/constants';
 import { RoomService } from '../../management/service/room.service';
 import { TicketService } from '../../management/service/ticket.service';
@@ -107,8 +107,21 @@ export class AiService {
       new DynamicTool({
         name: 'get_current_datetime',
         description:
-          'Get the current system date and time in ISO format. Use this tool for questions about current time, date, or schedule context.',
-        func: async () => new Date().toISOString(),
+          'Get the current date/time context in Vietnam timezone (UTC+7) and UTC. Use this for questions about current time/date and relative date words (hôm nay, ngày mai, ngày kia).',
+        func: async () => {
+          const now = new Date();
+          const vietnamDate = this.formatDateInVietnamTimezone(now);
+          const vietnamTime = this.formatTimeInVietnamTimezone(now);
+
+          return JSON.stringify({
+            success: true,
+            timezone: 'Asia/Ho_Chi_Minh',
+            utc_iso: now.toISOString(),
+            vietnam_date: vietnamDate,
+            vietnam_time: vietnamTime,
+            vietnam_datetime: `${vietnamDate} ${vietnamTime}`,
+          });
+        },
       }),
       new DynamicTool({
         name: 'get_user_context',
@@ -250,12 +263,13 @@ export class AiService {
       new DynamicTool({
         name: 'submit_leave_request',
         description:
-          'Submit leave request for current user. Input JSON required: date_from, date_to, reason. Optional: description.',
+          'Submit leave request for current user. Input JSON required: date_from, date_to, type, reason. Optional: description.',
         func: async (input: string) => {
           const payload = this.parseJsonInput(input);
           const leaveRequest = await this.leaveRequestService.submitLeaveRequest(params.userId, {
             date_from: String(payload.date_from || ''),
             date_to: String(payload.date_to || ''),
+              type: String(payload.type || '') as LEAVE_REQUEST_TYPE,
             reason: String(payload.reason || ''),
             description: this.readOptionalString(payload.description),
           });
@@ -932,10 +946,197 @@ export class AiService {
           }
         },
       }),
+      new DynamicTool({
+        name: 'get_system_overview_report',
+        description:
+          'Get a comprehensive system overview report. ADMIN ONLY. Returns combined attendance, leave, employee, and announcement highlights for the whole company. Use this when admin asks for system reports, dashboards, or a total overview.',
+        func: async () => {
+          const normalizedRoles = this.normalizeRoles(params.roles);
+          if (!this.hasRole(normalizedRoles, ROLE.ADMIN)) {
+            return JSON.stringify({
+              success: false,
+              error: 'Only ADMIN can access system overview report',
+            });
+          }
+
+          try {
+            const departments = await this.departmentService.findAll();
+            const overviewByDepartment: Array<{
+              department: string;
+              employees: number;
+              checked_in: number;
+              pending_checkout: number;
+              leave_total: number;
+              leave_pending: number;
+              leave_approved: number;
+              leave_rejected: number;
+            }> = [];
+
+            let totalEmployees = 0;
+            let totalCheckedIn = 0;
+            let totalPendingCheckout = 0;
+            let totalLeave = 0;
+            let totalLeavePending = 0;
+            let totalLeaveApproved = 0;
+            let totalLeaveRejected = 0;
+
+            for (const dept of departments) {
+              const employees = await this.employeeService.findByDepartmentId(dept.id);
+              let deptCheckedIn = 0;
+              let deptPendingCheckout = 0;
+              let deptLeaveTotal = 0;
+              let deptLeavePending = 0;
+              let deptLeaveApproved = 0;
+              let deptLeaveRejected = 0;
+
+              totalEmployees += employees.length;
+
+              for (const emp of employees) {
+                const attendanceStatus = await this.attendanceService.getTodayCheckInStatus(emp.id);
+                if (attendanceStatus.checkedIn) {
+                  deptCheckedIn++;
+                  totalCheckedIn++;
+
+                  if (!attendanceStatus.checkedOut) {
+                    deptPendingCheckout++;
+                    totalPendingCheckout++;
+                  }
+                }
+
+                try {
+                  const leaveSummary = await this.leaveRequestService.getMyLeaveSummary(emp.id);
+                  deptLeaveTotal += leaveSummary.total || 0;
+                  deptLeavePending += leaveSummary.pending || 0;
+                  deptLeaveApproved += leaveSummary.approved || 0;
+                  deptLeaveRejected += leaveSummary.rejected || 0;
+
+                  totalLeave += leaveSummary.total || 0;
+                  totalLeavePending += leaveSummary.pending || 0;
+                  totalLeaveApproved += leaveSummary.approved || 0;
+                  totalLeaveRejected += leaveSummary.rejected || 0;
+                } catch {
+                  // Skip employees whose leave summary is unavailable.
+                }
+              }
+
+              overviewByDepartment.push({
+                department: dept.name,
+                employees: employees.length,
+                checked_in: deptCheckedIn,
+                pending_checkout: deptPendingCheckout,
+                leave_total: deptLeaveTotal,
+                leave_pending: deptLeavePending,
+                leave_approved: deptLeaveApproved,
+                leave_rejected: deptLeaveRejected,
+              });
+            }
+
+            const recentAnnouncements = await this.announcementService.getAnnouncements(
+              {
+                page: 1,
+                pageSize: 5,
+              },
+              params.userId,
+            );
+
+            return JSON.stringify({
+              success: true,
+              scope: 'system',
+              generated_at: new Date().toISOString(),
+              total_departments: departments.length,
+              total_employees: totalEmployees,
+              attendance_today: {
+                checked_in: totalCheckedIn,
+                pending_checkout: totalPendingCheckout,
+              },
+              leave_requests: {
+                total: totalLeave,
+                pending: totalLeavePending,
+                approved: totalLeaveApproved,
+                rejected: totalLeaveRejected,
+              },
+              recent_announcements: {
+                total: recentAnnouncements.total,
+                items: recentAnnouncements.items.map((announcement) => ({
+                  id: announcement.id,
+                  title: announcement.title,
+                  category: announcement.category,
+                  pinned: announcement.pinned,
+                  created_at: announcement.created_at,
+                })),
+              },
+              by_department: overviewByDepartment,
+            });
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            return JSON.stringify({
+              success: false,
+              error: errorMessage,
+            });
+          }
+        },
+      }),
+      new DynamicTool({
+        name: 'get_vietnam_today',
+        description:
+          'Get date context in Vietnam timezone (UTC+7), including today/yesterday/tomorrow. Use this before booking to avoid day offset.',
+        func: async () => {
+          const now = new Date();
+          const dateStr = this.formatDateInVietnamTimezone(now);
+          const todayUtc = this.convertVietnamDateTimeToUTC(dateStr, '00:00:00');
+
+          const tomorrowDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+          const yesterdayDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          const tomorrowStr = this.formatDateInVietnamTimezone(tomorrowDate);
+          const yesterdayStr = this.formatDateInVietnamTimezone(yesterdayDate);
+
+          return JSON.stringify({
+            success: true,
+            timezone: 'Asia/Ho_Chi_Minh',
+            vietnam_date: dateStr,
+            vietnam_time: this.formatTimeInVietnamTimezone(now),
+            yesterday_vietnam_date: yesterdayStr,
+            tomorrow_vietnam_date: tomorrowStr,
+            iso_utc_midnight: todayUtc,
+          });
+        },
+      }),
+      new DynamicTool({
+        name: 'convert_vietnam_time_to_utc',
+        description:
+          'Convert Vietnam time (UTC+7) to UTC ISO string. IMPORTANT: Always use this tool when converting user-provided times for booking. Input JSON required: date (YYYY-MM-DD), time (HH:MM or HH:MM:SS). Returns UTC ISO string for booking.',
+        func: async (input: string) => {
+          const payload = this.parseJsonInput(input);
+          const dateStr = this.readOptionalString(payload.date);
+          const timeStr = this.readOptionalString(payload.time);
+
+          if (!dateStr || !timeStr) {
+            return JSON.stringify({
+              success: false,
+              error: 'date (YYYY-MM-DD) and time (HH:MM) are required',
+            });
+          }
+
+          try {
+            const utcIsoString = this.convertVietnamDateTimeToUTC(dateStr, timeStr);
+            return JSON.stringify({
+              success: true,
+              vietnam_time: `${dateStr} ${timeStr}`,
+              utc_iso: utcIsoString,
+              message: `Vietnam time ${dateStr} ${timeStr} (UTC+7) = ${utcIsoString} (UTC)`,
+            });
+          } catch (error) {
+            return JSON.stringify({
+              success: false,
+              error: 'Invalid date or time format. Use YYYY-MM-DD for date, HH:MM for time.',
+            });
+          }
+        },
+      }),
     ];
 
     const systemPrompt =
-      'You are an internal HR assistant. Answer clearly and concisely. Use available tools when needed. Always respond in Vietnamese unless the user asks for another language. You can support profile lookup, attendance, leave requests, announcements, ticket support, and meeting room booking. For ticket requests, first call suggest_ticket_category with issue_text, then call list_my_ticket_categories and ask user to choose a category before creating ticket. If department has no category permission, still provide recommendation based on category description and explain that admin/manager must assign permission first. For meeting room requests, proactively use tools to check schedule before suggesting booking and confirm booking details after creating one. For ADMIN users: You also have access to system-wide statistics tools (get_system_attendance_stats, get_system_leave_stats, get_system_employee_stats). Use these tools when admin asks for system reports, dashboards, or company-wide statistics.';
+      'You are an internal HR assistant. Answer clearly and concisely. Use available tools when needed. Always respond in Vietnamese unless the user asks for another language. You can support profile lookup, attendance, leave requests, announcements, ticket support, and meeting room booking. CRITICAL for meeting room booking: Vietnam is UTC+7 timezone. You must never infer date from raw UTC timestamps. Always resolve relative date phrases ("hôm nay", "ngày mai", "ngày mốt", "hôm qua") using get_vietnam_today first. Then convert each Vietnam local time to UTC using convert_vietnam_time_to_utc before calling book_meeting_room. Steps: (1) Call get_vietnam_today to resolve exact Vietnam date. (2) Map relative day phrase to a concrete YYYY-MM-DD in Vietnam timezone. (3) For each time user mentions, call convert_vietnam_time_to_utc with that date and time. (4) Use returned utc_iso values as start_time and end_time for book_meeting_room. Example: User says "7h đến 8h sáng ngày mai" -> get tomorrow_vietnam_date from get_vietnam_today -> convert 07:00 and 08:00 -> call book_meeting_room with returned UTC strings. For ticket requests, first call suggest_ticket_category with issue_text, then call list_my_ticket_categories and ask user to choose a category before creating ticket. If department has no category permission, still provide recommendation based on category description and explain that admin/manager must assign permission first. For ADMIN users: You also have access to system-wide statistics tools (get_system_attendance_stats, get_system_leave_stats, get_system_employee_stats, get_system_overview_report). Use get_system_overview_report when admin asks for a comprehensive system report, tổng quan hệ thống, dashboards, or company-wide statistics.';
 
     const agent = createAgent({
       model: llm,
@@ -1047,6 +1248,7 @@ export class AiService {
 
     const systemScopeTerms = [
       'he thong',
+      'tong quan',
       'toan cong ty',
       'cong ty',
       'toan bo',
@@ -1081,6 +1283,48 @@ export class AiService {
       .toLowerCase()
       .replace(/\s+/g, ' ')
       .trim();
+  }
+
+  private formatDateInVietnamTimezone(date: Date): string {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+
+    return formatter.format(date);
+  }
+
+  private formatTimeInVietnamTimezone(date: Date): string {
+    const formatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+
+    return formatter.format(date);
+  }
+
+  private convertVietnamDateTimeToUTC(dateStr: string, timeStr: string): string {
+    // Convert Vietnam time (UTC+7) to UTC ISO string
+    // dateStr: "2026-05-11", timeStr: "11:00" or "11:00:00"
+    // UTC time = Vietnam time - 7 hours
+    const parts = dateStr.split('-');
+    const timeParts = timeStr.split(':');
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1; // JS months are 0-indexed
+    const day = parseInt(parts[2], 10);
+    const hour = parseInt(timeParts[0], 10);
+    const minute = parseInt(timeParts[1], 10);
+    const second = timeParts[2] ? parseInt(timeParts[2], 10) : 0;
+
+    // Create a UTC date by subtracting 7 hours from Vietnam time
+    // This gives us the correct UTC timestamp
+    const dateUtc = new Date(Date.UTC(year, month, day, hour - 7, minute, second, 0));
+    return dateUtc.toISOString();
   }
 
   private parseJsonInput(input: string): Record<string, unknown> {

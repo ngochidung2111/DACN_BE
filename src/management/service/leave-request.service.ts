@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateLeaveRequestDto, LeaveRequestListDto, ProcessLeaveRequestDto, QueryLeaveRequestDto, UpdateLeaveRequestDto } from '../dto/leave-request';
 import { LeaveRequest } from '../entity/leave-request.entity';
-import { LEAVE_REQUEST_STATUS, ROLE } from '../entity/constants';
+import { LEAVE_REQUEST_STATUS, LEAVE_REQUEST_TYPE, ROLE } from '../entity/constants';
 import { plainToInstance } from 'class-transformer';
 import { LeaveRequestDto } from '../dto/leave-request';
 import { EMPLOYEE_SCHEDULE_ITEM_TYPE, EmployeeScheduleItemDto } from '../dto';
@@ -13,6 +13,44 @@ import { Notification } from '../entity/notification.entity';
 
 @Injectable()
 export class LeaveRequestService {
+  private readonly leaveTypes = [
+    {
+      code: LEAVE_REQUEST_TYPE.ANNUAL,
+      name: 'Nghỉ phép năm',
+      description: 'Nghỉ hưởng lương theo số ngày phép được cấp trong năm.',
+    },
+    {
+      code: LEAVE_REQUEST_TYPE.SICK,
+      name: 'Nghỉ ốm',
+      description: 'Nghỉ khi có giấy nghỉ ốm hoặc lý do sức khỏe.',
+    },
+    {
+      code: LEAVE_REQUEST_TYPE.PERSONAL,
+      name: 'Nghỉ việc riêng',
+      description: 'Nghỉ cho việc cá nhân, gia đình hoặc việc đột xuất.',
+    },
+    {
+      code: LEAVE_REQUEST_TYPE.UNPAID,
+      name: 'Nghỉ không lương',
+      description: 'Nghỉ quá số ngày phép hoặc không thuộc diện hưởng lương.',
+    },
+    {
+      code: LEAVE_REQUEST_TYPE.MATERNITY,
+      name: 'Nghỉ thai sản',
+      description: 'Áp dụng cho nghỉ thai sản theo quy định hiện hành.',
+    },
+    {
+      code: LEAVE_REQUEST_TYPE.PATERNITY,
+      name: 'Nghỉ cha/mẹ mới sinh',
+      description: 'Áp dụng cho nghỉ chăm con mới sinh theo chính sách công ty.',
+    },
+    {
+      code: LEAVE_REQUEST_TYPE.COMPENSATORY,
+      name: 'Nghỉ bù',
+      description: 'Nghỉ bù cho thời gian làm thêm hoặc làm việc vào ngày nghỉ.',
+    },
+  ] as const;
+
   constructor(
     @InjectRepository(LeaveRequest)
     private readonly leaveRequestRepository: Repository<LeaveRequest>,
@@ -20,6 +58,10 @@ export class LeaveRequestService {
     private readonly notificationRepository: Repository<Notification>,
     private readonly employeeService: EmployeeService,
   ) {}
+
+  getLeaveTypes() {
+    return this.leaveTypes;
+  }
 
   async submitLeaveRequest(employeeId: string, dto: CreateLeaveRequestDto) {
     const employee = await this.employeeService.findById(employeeId);
@@ -39,6 +81,7 @@ export class LeaveRequestService {
       employee,
       date_from: dateFrom,
       date_to: dateTo,
+      type: dto.type,
       reason: dto.reason,
       description: dto.description ?? '',
     });

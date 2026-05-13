@@ -9,7 +9,7 @@ export class Booking {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => Room)
+  @ManyToOne(() => Room, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'room_id' })
   room: Room;
 

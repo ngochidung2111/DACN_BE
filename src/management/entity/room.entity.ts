@@ -1,10 +1,14 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { ROOM_STATUS } from './constants';
+import { Booking } from './booking.entity';
 
 @Entity()
 export class Room {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @OneToMany(() => Booking, (booking) => booking.room, { cascade: ['remove'] })
+  bookings: Booking[];
 
   @Column()
   name: string;
