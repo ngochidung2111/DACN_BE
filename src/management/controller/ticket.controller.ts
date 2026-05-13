@@ -83,6 +83,26 @@ export class TicketController {
   }
 
   /**
+   * Soft delete a ticket category
+   */
+  @Delete('categories/:id')
+  @ApiOperation({ summary: 'Soft delete a ticket category' })
+  @ApiResponse({
+    status: 200,
+    description: 'Ticket category deleted successfully',
+  })
+  @Roles(ROLE.ADMIN, ROLE.MANAGER)
+  async deleteCategory(@Param('id') id: string) {
+    await this.ticketService.deleteTicketCategory(id);
+    await this.bumpCacheVersion();
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'Ticket category deleted successfully',
+      data: null,
+    });
+  }
+
+  /**
    * List ticket categories
    */
   @Get('categories')

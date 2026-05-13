@@ -789,11 +789,24 @@ export class TicketService {
     return this.ticketCategoryRepository.save(category);
   }
 
+  async deleteTicketCategory(categoryId: string): Promise<void> {
+    const category = await this.ticketCategoryRepository.findOne({
+      where: { id: categoryId },
+    });
+
+    if (!category) {
+      throw new NotFoundException(`Ticket category with ID ${categoryId} not found`);
+    }
+
+    await this.ticketCategoryRepository.softDelete(categoryId);
+  }
+
   async getTicketCategories(query: QueryTicketCategoryDto) {
     const qb = this.ticketCategoryRepository
       .createQueryBuilder('category')
       .leftJoinAndSelect('category.departments', 'department')
       .where('category.is_active = :isActive', { isActive: true })
+      .andWhere('category.deletedAt IS NULL')
       .orderBy('category.name', 'ASC');
 
     if (query.department_id) {

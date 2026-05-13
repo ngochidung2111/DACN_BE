@@ -1,4 +1,5 @@
 import { Expose, Transform, Type } from "class-transformer";
+import { LEAVE_REQUEST_TYPE } from '../../entity/constants';
 
 class LeaveRequestEmployeeDto {
     @Expose()
@@ -31,6 +32,9 @@ export class LeaveRequestDto {
 
     @Expose()
     date_to: Date;
+
+    @Expose()
+    type: LEAVE_REQUEST_TYPE;
 
     @Expose()
     reason: string;

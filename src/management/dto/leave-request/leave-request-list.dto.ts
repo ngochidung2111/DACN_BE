@@ -29,6 +29,9 @@ export class LeaveRequestListDto {
   date_to: Date;
 
   @Expose()
+  type: string;
+
+  @Expose()
   reason: string;
 
   @Expose()

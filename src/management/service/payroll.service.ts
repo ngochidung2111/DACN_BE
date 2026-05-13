@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 
 import { Repository } from 'typeorm';
 import { Attendance } from '../entity/attendance.entity';
+import { LeaveRequest } from '../entity/leave-request.entity';
+import { LEAVE_REQUEST_STATUS, LEAVE_REQUEST_TYPE } from '../entity/constants';
 import { PAYROLL_STATUS, Payroll } from '../entity/payroll.entity';
 import { Holiday } from '../entity/holiday.entity';
 import { EmployeeService } from '../../auth/service/employee.service';
@@ -18,6 +20,8 @@ export class PayrollService {
     private readonly payrollRepository: Repository<Payroll>,
     @InjectRepository(Attendance)
     private readonly attendanceRepository: Repository<Attendance>,
+    @InjectRepository(LeaveRequest)
+    private readonly leaveRequestRepository: Repository<LeaveRequest>,
     private readonly employeeService: EmployeeService,
     private readonly holidayService: HolidayService,
   ) {}
@@ -37,6 +41,7 @@ export class PayrollService {
 
     // Calculate working days excluding weekends and holidays
     const standardWorkingDays = await this.calculateWorkingDaysInMonth(year, month);
+    const leaveBreakdown = await this.getLeaveBreakdownInMonth(employeeId, year, month);
 
     const attendances = await this.attendanceRepository
       .createQueryBuilder('attendance')
@@ -56,8 +61,11 @@ export class PayrollService {
     const standardHours = standardWorkingDays * this.standardWorkingHoursPerDay;
     const basicSalarySnapshot = Number(employee.basicSalary);
     const hourlyRate = basicSalarySnapshot / standardHours;
+    const paidLeaveHours = this.round2(leaveBreakdown.paidLeaveDays * this.standardWorkingHoursPerDay);
+    const unpaidLeaveHours = this.round2(leaveBreakdown.unpaidLeaveDays * this.standardWorkingHoursPerDay);
+    const paidHours = workedHours + paidLeaveHours;
 
-    const regularHours = Math.min(workedHours, standardHours);
+    const regularHours = Math.min(paidHours, standardHours);
     const overtimeHours = this.round2(Math.max(0, workedHours - standardHours));
 
     const grossSalary = this.round2(regularHours * hourlyRate + overtimeHours * hourlyRate * this.overtimeRate);
@@ -66,7 +74,6 @@ export class PayrollService {
     const insuranceAmount = this.round2(grossSalary * 0.105); // BHXH 8% + BHYT 1.5% + BHTN 1% = 10.5%
     const dependants = employee.numberOfChildren ?? 0;
     const taxableIncome = Math.max(0, grossSalary - insuranceAmount - 15_500_000 - 6_200_000 * dependants);
-    console.log(taxableIncome);
     
     const taxAmount = this.calculatePIT(taxableIncome);
     const deduction = 0;
@@ -85,6 +92,10 @@ export class PayrollService {
     payroll.month = month;
     payroll.basicSalarySnapshot = this.round2(basicSalarySnapshot);
     payroll.workedHours = workedHours;
+    payroll.paidLeaveDays = leaveBreakdown.paidLeaveDays;
+    payroll.paidLeaveHours = paidLeaveHours;
+    payroll.unpaidLeaveDays = leaveBreakdown.unpaidLeaveDays;
+    payroll.unpaidLeaveHours = unpaidLeaveHours;
     payroll.overtimeHours = overtimeHours;
     payroll.insuranceAmount = insuranceAmount;
     payroll.allowance = allowance;
@@ -104,6 +115,102 @@ export class PayrollService {
     });
   }
 
+  async getWorkingDaysInMonth(year: number, month: number): Promise<number> {
+    if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+      throw new BadRequestException('Invalid period');
+    }
+
+    return this.calculateWorkingDaysInMonth(year, month);
+  }
+
+  private isPaidLeaveType(type: LEAVE_REQUEST_TYPE): boolean {
+    return [
+      LEAVE_REQUEST_TYPE.ANNUAL,
+      LEAVE_REQUEST_TYPE.SICK,
+      LEAVE_REQUEST_TYPE.PERSONAL,
+      LEAVE_REQUEST_TYPE.MATERNITY,
+      LEAVE_REQUEST_TYPE.PATERNITY,
+      LEAVE_REQUEST_TYPE.COMPENSATORY,
+    ].includes(type);
+  }
+
+  private toUtcDateOnly(date: Date): Date {
+    const value = new Date(date);
+    value.setUTCHours(0, 0, 0, 0);
+    return value;
+  }
+
+  private addUtcDays(date: Date, days: number): Date {
+    const value = new Date(date);
+    value.setUTCDate(value.getUTCDate() + days);
+    return value;
+  }
+
+  private formatUtcDate(date: Date): string {
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  private async getLeaveBreakdownInMonth(
+    employeeId: string,
+    year: number,
+    month: number,
+  ): Promise<{ paidLeaveDays: number; unpaidLeaveDays: number }> {
+    const periodStart = new Date(Date.UTC(year, month - 1, 1));
+    const periodEnd = new Date(Date.UTC(year, month, 1));
+    const periodStartDay = this.toUtcDateOnly(periodStart);
+    const periodEndDay = this.addUtcDays(this.toUtcDateOnly(periodEnd), -1);
+
+    const holidays = await this.holidayService.getHolidaysByMonth(year, month);
+    const holidayDates = new Set(holidays.map((h) => this.formatUtcDate(h.date)));
+
+    const leaveRequests = await this.leaveRequestRepository
+      .createQueryBuilder('leaveRequest')
+      .leftJoin('leaveRequest.employee', 'employee')
+      .where('employee.id = :employeeId', { employeeId })
+      .andWhere('leaveRequest.status = :status', { status: LEAVE_REQUEST_STATUS.APPROVED })
+      .andWhere('leaveRequest.date_from < :periodEnd', { periodEnd })
+      .andWhere('leaveRequest.date_to >= :periodStart', { periodStart })
+      .getMany();
+
+    const paidLeaveDaysSet = new Set<string>();
+    const unpaidLeaveDaysSet = new Set<string>();
+
+    for (const leaveRequest of leaveRequests) {
+      const requestStart = this.toUtcDateOnly(leaveRequest.date_from);
+      const requestEnd = this.toUtcDateOnly(leaveRequest.date_to);
+      const overlapStart = requestStart > periodStartDay ? requestStart : periodStartDay;
+      const overlapEnd = requestEnd < periodEndDay ? requestEnd : periodEndDay;
+
+      if (overlapStart > overlapEnd) {
+        continue;
+      }
+
+      const targetSet = this.isPaidLeaveType(leaveRequest.type) ? paidLeaveDaysSet : unpaidLeaveDaysSet;
+
+      for (let current = overlapStart; current <= overlapEnd; current = this.addUtcDays(current, 1)) {
+        const dayOfWeek = current.getUTCDay();
+        if (dayOfWeek === 0 || dayOfWeek === 6) {
+          continue;
+        }
+
+        const dateKey = this.formatUtcDate(current);
+        if (holidayDates.has(dateKey)) {
+          continue;
+        }
+
+        targetSet.add(dateKey);
+      }
+    }
+
+    return {
+      paidLeaveDays: paidLeaveDaysSet.size,
+      unpaidLeaveDays: unpaidLeaveDaysSet.size,
+    };
+  }
+
   /**
    * Tính số ngày làm việc trong tháng (trừ thứ 7, chủ nhật và ngày lễ)
    */
@@ -113,16 +220,14 @@ export class PayrollService {
 
     // Get all holidays in the month
     const holidays = await this.holidayService.getHolidaysByMonth(year, month);
-    const holidayDates = new Set(
-      holidays.map((h) => new Date(h.date).toDateString()),
-    );
+    const holidayDates = new Set(holidays.map((h) => this.formatUtcDate(h.date)));
 
     let workingDays = 0;
     const currentDate = new Date(startDate);
 
     while (currentDate < endDate) {
       const dayOfWeek = currentDate.getUTCDay();
-      const dateString = currentDate.toDateString();
+      const dateString = this.formatUtcDate(currentDate);
 
       // Kiểm tra nếu không phải thứ 7 (6) hoặc chủ nhật (0) và không phải ngày lễ
       if (dayOfWeek !== 0 && dayOfWeek !== 6 && !holidayDates.has(dateString)) {

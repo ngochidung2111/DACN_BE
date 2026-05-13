@@ -99,6 +99,13 @@ export class RoomService {
   // Xóa phòng
   async deleteRoom(roomId: string): Promise<void> {
     const room = await this.getRoomById(roomId);
+    
+    // Delete image from S3 if exists
+    // if (room.imageKey) {
+    //   await this.s3Service.deleteFile(room.imageKey);
+    // }
+    
+    // CASCADE DELETE will automatically remove related bookings
     await this.roomRepository.remove(room);
   }
 
