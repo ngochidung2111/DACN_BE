@@ -49,6 +49,11 @@ export class LeaveRequestService {
       name: 'Nghỉ bù',
       description: 'Nghỉ bù cho thời gian làm thêm hoặc làm việc vào ngày nghỉ.',
     },
+    {
+      code: LEAVE_REQUEST_TYPE.OTHER,
+      name: 'Nghỉ khác',
+      description: 'Các loại nghỉ khác không thuộc các danh mục trên.',
+    }
   ] as const;
 
   constructor(
