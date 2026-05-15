@@ -852,5 +852,30 @@ export class TicketService {
     department.ticketCategories = categories;
     return this.departmentRepository.save(department);
   }
+
+  async removeTicketCategoryFromDepartment(
+    departmentId: string,
+    categoryId: string,
+  ): Promise<Department> {
+    const department = await this.departmentRepository.findOne({
+      where: { id: departmentId },
+      relations: ['ticketCategories'],
+    });
+
+    if (!department) {
+      throw new NotFoundException(`Department with ID ${departmentId} not found`);
+    }
+
+    const existing = department.ticketCategories || [];
+    const index = existing.findIndex((c) => c.id === categoryId);
+    if (index === -1) {
+      throw new BadRequestException(
+        `Ticket category with ID ${categoryId} is not assigned to department ${departmentId}`,
+      );
+    }
+
+    department.ticketCategories = existing.filter((c) => c.id !== categoryId);
+    return this.departmentRepository.save(department);
+  }
 }
 

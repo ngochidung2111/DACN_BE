@@ -174,6 +174,33 @@ export class TicketController {
   }
 
   /**
+   * Remove a ticket category assignment from a department
+   */
+  @Delete('departments/:departmentId/categories/:categoryId')
+  @ApiOperation({ summary: 'Remove a ticket category from a department' })
+  @ApiResponse({
+    status: 200,
+    description: 'Ticket category unassigned from department successfully',
+  })
+  @Roles(ROLE.ADMIN, ROLE.MANAGER)
+  async removeCategoryFromDepartment(
+    @Param('departmentId') departmentId: string,
+    @Param('categoryId') categoryId: string,
+  ) {
+    const department = await this.ticketService.removeTicketCategoryFromDepartment(
+      departmentId,
+      categoryId,
+    );
+    await this.bumpCacheVersion();
+
+    return ResponseBuilder.createResponse({
+      statusCode: 200,
+      message: 'Ticket category unassigned from department successfully',
+      data: department,
+    });
+  }
+
+  /**
    * Create a new ticket
    */
   @Post()
