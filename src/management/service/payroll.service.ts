@@ -52,7 +52,12 @@ export class PayrollService {
       .andWhere('attendance.TimeOut IS NOT NULL')
       .getMany();
 
+    // Build approved leave day set (UTC+7 local date strings) and exclude attendances on those days
+    const approvedLeaveDaySet = await this.getApprovedLeaveDaySetForEmployee(employeeId, periodStart, periodEnd);
+
     const totalWorkedMs = attendances.reduce((sum, attendance) => {
+      const day = this.formatUtc7Date(attendance.TimeIn);
+      if (approvedLeaveDaySet.has(day)) return sum; // ignore attendance on approved leave day
       const workedMs = attendance.TimeOut.getTime() - attendance.TimeIn.getTime();
       return sum + Math.max(0, workedMs);
     }, 0);
@@ -64,7 +69,7 @@ export class PayrollService {
     const paidLeaveHours = this.round2(leaveBreakdown.paidLeaveDays * this.standardWorkingHoursPerDay);
     const unpaidLeaveHours = this.round2(leaveBreakdown.unpaidLeaveDays * this.standardWorkingHoursPerDay);
     const paidHours = workedHours + paidLeaveHours;
-
+    
     const regularHours = Math.min(paidHours, standardHours);
     const overtimeHours = this.round2(Math.max(0, workedHours - standardHours));
 
@@ -284,5 +289,44 @@ export class PayrollService {
 
   private round2(value: number): number {
     return Number(value.toFixed(2));
+  }
+
+  private formatUtc7Date(date: Date): string {
+    const v = new Date(date.getTime() + 7 * 60 * 60 * 1000);
+    const year = v.getUTCFullYear();
+    const month = String(v.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(v.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  private async getApprovedLeaveDaySetForEmployee(employeeId: string, periodStart: Date, periodEnd: Date): Promise<Set<string>> {
+    const result = new Set<string>();
+
+    const leaveRequests = await this.leaveRequestRepository
+      .createQueryBuilder('leaveRequest')
+      .leftJoinAndSelect('leaveRequest.employee', 'employee')
+      .where('employee.id = :employeeId', { employeeId })
+      .andWhere('leaveRequest.status = :status', { status: LEAVE_REQUEST_STATUS.APPROVED })
+      .andWhere('leaveRequest.date_from < :periodEnd', { periodEnd })
+      .andWhere('leaveRequest.date_to >= :periodStart', { periodStart })
+      .getMany();
+
+    const periodStartDay = this.toUtcDateOnly(periodStart);
+    const periodEndDay = this.addUtcDays(this.toUtcDateOnly(periodEnd), -1);
+
+    for (const leaveRequest of leaveRequests) {
+      const requestStart = this.toUtcDateOnly(leaveRequest.date_from);
+      const requestEnd = this.toUtcDateOnly(leaveRequest.date_to);
+      const overlapStart = requestStart > periodStartDay ? requestStart : periodStartDay;
+      const overlapEnd = requestEnd < periodEndDay ? requestEnd : periodEndDay;
+
+      if (overlapStart > overlapEnd) continue;
+
+      for (let current = overlapStart; current <= overlapEnd; current = this.addUtcDays(current, 1)) {
+        result.add(this.formatUtc7Date(current));
+      }
+    }
+
+    return result;
   }
 }
