@@ -11,7 +11,7 @@ import { EmployeeService } from "../../auth/service/employee.service";
 
 @Injectable()
 export class AttendanceService {
-    private readonly standardWorkingDays = 26;
+    
 
     constructor(
         @InjectRepository(Attendance)
@@ -38,9 +38,11 @@ export class AttendanceService {
     }
 
     private formatUtcDate(date: Date) {
-        const year = date.getUTCFullYear();
-        const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-        const day = String(date.getUTCDate()).padStart(2, '0');
+        // Normalize to UTC+7 (Vietnam) so grouping is by local day
+        const v = new Date(date.getTime() + 7 * 60 * 60 * 1000);
+        const year = v.getUTCFullYear();
+        const month = String(v.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(v.getUTCDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
     }
 
@@ -270,45 +272,89 @@ export class AttendanceService {
             .andWhere('attendance.TimeOut IS NOT NULL')
             .getMany();
 
-        const dailyWorkedMs = new Map<string, number>();
+        const leaveDaySets = await this.getApprovedLeaveDaySetsByEmployees([employee.id], periodStart, periodEnd);
+        const approvedLeaveSet = leaveDaySets.get(employee.id) ?? new Set<string>();
+
+        // Aggregate per local day (UTC+7): total worked ms and earliest TimeIn
+        const dailyStats = new Map<string, { totalWorkedMs: number; earliestTimeIn?: Date }>();
         for (const attendance of attendances) {
             const day = this.formatUtcDate(attendance.TimeIn);
+            // Skip any attendance that falls on an approved leave day
+            if (approvedLeaveSet.has(day)) continue;
+
             const workedMs = Math.max(0, attendance.TimeOut.getTime() - attendance.TimeIn.getTime());
-            dailyWorkedMs.set(day, (dailyWorkedMs.get(day) ?? 0) + workedMs);
+            const existing = dailyStats.get(day);
+            const earliest = existing?.earliestTimeIn ? (attendance.TimeIn < existing.earliestTimeIn ? attendance.TimeIn : existing.earliestTimeIn) : attendance.TimeIn;
+            dailyStats.set(day, {
+                totalWorkedMs: (existing?.totalWorkedMs ?? 0) + workedMs,
+                earliestTimeIn: earliest,
+            });
         }
 
         const eightHoursMs = 8 * 60 * 60 * 1000;
         let enoughDays = 0;
         let lateDays = 0;
 
-        for (const totalWorkedMs of dailyWorkedMs.values()) {
-            if (totalWorkedMs >= eightHoursMs) {
+        for (const [, stats] of dailyStats.entries()) {
+            if (stats.totalWorkedMs >= eightHoursMs) {
                 enoughDays += 1;
-            } else {
-                lateDays += 1;
+            }
+
+            if (stats.earliestTimeIn) {
+                const timeInThreshold = this.buildUtc7Threshold(stats.earliestTimeIn, 8);
+                if (stats.earliestTimeIn > timeInThreshold) {
+                    lateDays += 1;
+                }
             }
         }
 
         const totalWorkedHours = Number(
-            (Array.from(dailyWorkedMs.values()).reduce((sum, workedMs) => sum + workedMs, 0) / (60 * 60 * 1000)).toFixed(2)
+            (Array.from(dailyStats.values()).reduce((sum, s) => sum + s.totalWorkedMs, 0) / (60 * 60 * 1000)).toFixed(2)
         );
-        const workedDays = enoughDays + lateDays;
-        const absentDays = await this.countApprovedLeaveDaysForEmployee(
+
+        const workedDays = dailyStats.size;
+
+        const approvedLeaveDaysCount = await this.countApprovedLeaveDaysForEmployee(
             employee.id,
             periodStart,
             periodEnd,
         );
 
+        const requiredWorkingDays = await this.calculateWorkingDaysInMonth(year, month);
+
+        // Absent days = requiredWorkingDays - workedDays - approvedLeaveDays (clamped >= 0)
+        const absentDays = Math.max(0, requiredWorkingDays - workedDays - (approvedLeaveDaysCount ?? 0));
+
         return {
             year,
             month,
-            requiredWorkingDays: this.standardWorkingDays,
+            requiredWorkingDays,
             workedDays,
             enoughDays,
             lateDays,
             absentDays,
             totalWorkedHours,
         };
+    }
+
+    private async calculateWorkingDaysInMonth(year: number, month: number): Promise<number> {
+        const startDate = new Date(Date.UTC(year, month - 1, 1));
+        const endDate = new Date(Date.UTC(year, month, 1));
+
+        let workingDays = 0;
+        const currentDate = new Date(startDate);
+
+        while (currentDate < endDate) {
+            const dayOfWeek = currentDate.getUTCDay();
+
+            if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                workingDays++;
+            }
+
+            currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+        }
+
+        return workingDays;
     }
 
     async getDepartmentMonthlyAttendanceSummary(
@@ -348,8 +394,14 @@ export class AttendanceService {
             .orderBy('attendance.TimeIn', 'ASC')
             .getMany();
 
+        const employeeIds = employees.map((employee) => employee.id);
         const leaveDaysByEmployee = await this.getApprovedLeaveDayCountByEmployees(
-            employees.map((employee) => employee.id),
+            employeeIds,
+            periodStart,
+            periodEnd,
+        );
+        const leaveDaySetsByEmployee = await this.getApprovedLeaveDaySetsByEmployees(
+            employeeIds,
             periodStart,
             periodEnd,
         );
@@ -385,7 +437,13 @@ export class AttendanceService {
             const absentDays = leaveDaysByEmployee.get(employee.id) ?? 0;
             totalAbsentDays += absentDays;
 
+            const approvedSet = leaveDaySetsByEmployee.get(employee.id) ?? new Set<string>();
             for (const day of days) {
+                // If the day is an approved leave day, skip attendance counting for it
+                if (approvedSet.has(day)) {
+                    continue;
+                }
+
                 const attendance = attendanceMap.get(`${employee.id}:${day}`);
 
                 if (!attendance) {
@@ -541,5 +599,64 @@ export class AttendanceService {
         }
 
         return result;
+    }
+
+    private async getApprovedLeaveDaySetsByEmployees(
+        employeeIds: string[],
+        periodStart: Date,
+        periodEnd: Date,
+    ): Promise<Map<string, Set<string>>> {
+        const result = new Map<string, Set<string>>();
+
+        if (employeeIds.length === 0) {
+            return result;
+        }
+
+        const leaveRequests = await this.leaveRequestRepository
+            .createQueryBuilder('leaveRequest')
+            .leftJoinAndSelect('leaveRequest.employee', 'employee')
+            .where('employee.id IN (:...employeeIds)', { employeeIds })
+            .andWhere('leaveRequest.status = :status', { status: LEAVE_REQUEST_STATUS.APPROVED })
+            .andWhere('leaveRequest.date_from < :periodEnd', { periodEnd })
+            .andWhere('leaveRequest.date_to >= :periodStart', { periodStart })
+            .getMany();
+
+        const periodStartDay = this.toUtcDateOnly(periodStart);
+        const periodEndDay = this.addUtcDays(this.toUtcDateOnly(periodEnd), -1);
+        const leaveDaySets = new Map<string, Set<string>>();
+
+        for (const leaveRequest of leaveRequests) {
+            const employeeId = leaveRequest.employee?.id;
+            if (!employeeId) {
+                continue;
+            }
+
+            const requestStart = this.toUtcDateOnly(leaveRequest.date_from);
+            const requestEnd = this.toUtcDateOnly(leaveRequest.date_to);
+            const overlapStart = requestStart > periodStartDay ? requestStart : periodStartDay;
+            const overlapEnd = requestEnd < periodEndDay ? requestEnd : periodEndDay;
+
+            if (overlapStart > overlapEnd) {
+                continue;
+            }
+
+            const days = leaveDaySets.get(employeeId) ?? new Set<string>();
+            for (
+                let current = overlapStart;
+                current <= overlapEnd;
+                current = this.addUtcDays(current, 1)
+            ) {
+                days.add(this.formatUtcDate(current));
+            }
+
+            leaveDaySets.set(employeeId, days);
+        }
+
+        // Ensure entries exist for all requested employeeIds
+        for (const id of employeeIds) {
+            if (!leaveDaySets.has(id)) leaveDaySets.set(id, new Set<string>());
+        }
+
+        return leaveDaySets;
     }
 }
