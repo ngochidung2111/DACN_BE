@@ -46,8 +46,8 @@ export class Employee {
   @Column({nullable: true})
   basicSalary: number;
 
-  @Column({nullable: true})
-  grossSalary: number;
+ 
+  // grossSalary removed intentionally
 
   @Column({nullable: true})
   signDate: Date;

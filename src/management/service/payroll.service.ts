@@ -197,11 +197,25 @@ export class PayrollService {
         }
 
         const dateKey = this.formatUtcDate(current);
+
+        // If the day is a holiday, count it as a paid day regardless of leave type
         if (holidayDates.has(dateKey)) {
+          paidLeaveDaysSet.add(dateKey);
           continue;
         }
 
         targetSet.add(dateKey);
+      }
+    }
+
+    // Additionally, any holiday within the period should be counted as a paid day
+    for (let current = periodStartDay; current <= periodEndDay; current = this.addUtcDays(current, 1)) {
+      const dayOfWeek = current.getUTCDay();
+      if (dayOfWeek === 0 || dayOfWeek === 6) continue;
+
+      const dateKey = this.formatUtcDate(current);
+      if (holidayDates.has(dateKey)) {
+        paidLeaveDaysSet.add(dateKey);
       }
     }
 
@@ -218,19 +232,14 @@ export class PayrollService {
     const startDate = new Date(Date.UTC(year, month - 1, 1));
     const endDate = new Date(Date.UTC(year, month, 1));
 
-    // Get all holidays in the month
-    const holidays = await this.holidayService.getHolidaysByMonth(year, month);
-    const holidayDates = new Set(holidays.map((h) => this.formatUtcDate(h.date)));
-
     let workingDays = 0;
     const currentDate = new Date(startDate);
 
     while (currentDate < endDate) {
       const dayOfWeek = currentDate.getUTCDay();
-      const dateString = this.formatUtcDate(currentDate);
 
       // Kiểm tra nếu không phải thứ 7 (6) hoặc chủ nhật (0) và không phải ngày lễ
-      if (dayOfWeek !== 0 && dayOfWeek !== 6 && !holidayDates.has(dateString)) {
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
         workingDays++;
       }
 
