@@ -135,13 +135,6 @@ export class EmployeeDto {
     @Expose()
     basicSalary?: number;
 
-    @ApiProperty({
-        description: 'Gross salary of the employee',
-        example: 60000,
-        required: false,
-    })
-    @Expose()
-    grossSalary?: number;
 
     @ApiProperty({
         description: 'Contract sign date',
@@ -283,14 +276,6 @@ export class DetailEmployeeDto {
     })
     @Expose()
     basicSalary?: number;
-
-    @ApiProperty({
-        description: 'Gross salary of the employee',
-        example: 60000,
-        required: false,
-    })
-    @Expose()
-    grossSalary?: number;
 
     @ApiProperty({
         description: 'Contract sign date',
@@ -539,13 +524,6 @@ export class AdminUpdateEmployeeDto {
     @IsOptional()
     basicSalary?: number;
 
-    @ApiProperty({ description: 'Gross salary of the employee', example: 60000, required: false })
-    @Expose()
-    @Type(() => Number)
-    @IsNumber()
-    @IsOptional()
-    grossSalary?: number;
-
     @ApiProperty({ description: 'Contract sign date', example: '2024-01-01', required: false })
     @Expose()
     @Type(() => Date)
@@ -673,12 +651,6 @@ export class AdminCreateEmployeeDto {
     @IsOptional()
     basicSalary?: number;
 
-    @ApiProperty({ description: 'Gross salary of the employee', example: 60000, required: false })
-    @Expose()
-    @Type(() => Number)
-    @IsNumber()
-    @IsOptional()
-    grossSalary?: number;
 
     @ApiProperty({ description: 'Contract sign date', example: '2024-01-01', required: false })
     @Expose()
